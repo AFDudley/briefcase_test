@@ -1,0 +1,16 @@
+---
+- name: Sample Playbook
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Hello World
+      debug:
+        msg: "Hello from Ansible in Briefcase!"
+    
+    - name: Get System Info
+      debug:
+        msg: "Running on {{ ansible_host }}"
+      when: ansible_host is defined
+
+    - name: Check Connection
+      ping:

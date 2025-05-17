@@ -21,6 +21,8 @@ test_sources = [
 ]
 
 requires = [
+    "ansible-core>=2.15.0",
+    "ansible-runner>=2.3.1",
 ]
 test_requires = [
     "pytest",
