@@ -150,15 +150,12 @@ class briefcase_ansible_test(toga.App):
                     if filename.endswith('.ini') or filename.endswith('.yml'):
                         inventory_files.append(os.path.join(inventory_dir, filename))
 
-                self.add_background_task(self.update_output_task(
-                    f"Found {len(inventory_files)} inventory files\n"
-                ))
+                # Update UI from the main thread
+                self.add_text_to_output(f"Found {len(inventory_files)} inventory files\n")
 
                 # Process each inventory file
                 for inv_file in inventory_files:
-                    self.add_background_task(self.update_output_task(
-                        f"Parsing file: {os.path.basename(inv_file)}\n"
-                    ))
+                    self.add_text_to_output(f"Parsing file: {os.path.basename(inv_file)}\n")
 
                     # Use Ansible's inventory manager to parse the file
                     loader = DataLoader()
@@ -184,45 +181,62 @@ class briefcase_ansible_test(toga.App):
                     # Convert inventory data to JSON
                     inventory_json = json.dumps(inventory_data, indent=2)
 
-                    # Update the UI with the parsed inventory
-                    self.add_background_task(self.update_output_task(
-                        f"Parsed data:\n{inventory_json}\n\n"
-                    ))
+                    # Update the UI
+                    self.add_text_to_output(f"Parsed data:\n{inventory_json}\n\n")
 
                 # Final update when everything is done
-                async def update_complete():
-                    self.output_view.value += "Inventory parsing completed successfully.\n"
-                    self.status_label.text = "Completed"
-
-                # Schedule the UI update
-                task = asyncio.create_task(update_complete())
-                self.background_tasks.add(task)
-                task.add_done_callback(self.background_tasks.discard)
+                self.add_text_to_output("Inventory parsing completed successfully.\n")
+                self.update_status("Completed")
 
             except Exception as error:
                 # Handle any exceptions
                 error_message = str(error)
-
-                async def update_error():
-                    self.output_view.value = f"Error parsing inventory: {error_message}"
-                    self.status_label.text = "Error"
-
-                # Schedule the error update
-                task = asyncio.create_task(update_error())
-                self.background_tasks.add(task)
-                task.add_done_callback(self.background_tasks.discard)
+                self.add_text_to_output(f"Error parsing inventory: {error_message}")
+                self.update_status("Error")
 
         # Start background thread
         thread = threading.Thread(target=run_in_background)
         thread.daemon = True
         thread.start()
 
+    def add_text_to_output(self, text):
+        """Add text to the output view from any thread."""
+        def update_ui():
+            self.output_view.value += text
+        
+        # If we're on the main thread, update directly
+        if threading.current_thread() is threading.main_thread():
+            update_ui()
+        else:
+            # Otherwise, schedule the update on the main thread using the event loop
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(self.update_output_task(text), loop)
+    
+    def update_status(self, text):
+        """Update the status label from any thread."""
+        def update_ui():
+            self.status_label.text = text
+        
+        # If we're on the main thread, update directly
+        if threading.current_thread() is threading.main_thread():
+            update_ui()
+        else:
+            # Otherwise, schedule the update on the main thread using the event loop
+            loop = asyncio.get_event_loop()
+            asyncio.run_coroutine_threadsafe(self.update_status_task(text), loop)
+    
     def update_output_task(self, text):
         """Returns an async function that appends text to the output view."""
         async def update_output(interface):
             current_text = self.output_view.value
             self.output_view.value = current_text + text
         return update_output
+        
+    def update_status_task(self, text):
+        """Returns an async function that updates the status label."""
+        async def update_status_async(interface):
+            self.status_label.text = text
+        return update_status_async
 
 
 def main():
