@@ -81,10 +81,6 @@ except ImportError:
 from ansible.inventory.manager import InventoryManager
 from ansible.parsing.dataloader import DataLoader
 
-# Define direction constants since they may not be available in the current Toga version
-COLUMN = "column"
-ROW = "row"
-
 
 class briefcase_ansible_test(toga.App):
     def startup(self):
@@ -96,7 +92,7 @@ class briefcase_ansible_test(toga.App):
         self.main_event_loop = asyncio.get_event_loop()
 
         # Create main box with vertical layout
-        main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+        main_box = toga.Box(style=Pack(direction="column", margin=10))
 
         # Title
         title_label = toga.Label(
