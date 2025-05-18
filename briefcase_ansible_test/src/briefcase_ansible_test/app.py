@@ -28,10 +28,10 @@ class PwdModule:
     class Struct:
         def __init__(self, **entries):
             self.__dict__.update(entries)
-    
+
     def getpwuid(self, uid):
         return self.Struct(pw_name='mobile')
-    
+
     def getpwnam(self, name):
         return self.Struct(pw_uid=0, pw_gid=0, pw_dir='/home/mobile')
 
@@ -58,16 +58,16 @@ sys.modules['ansible.module_utils._text'] = type('MockTextModule', (), {
 try:
     # Import the real module to use most of its functionality
     import ansible.module_utils.basic as real_basic
-    
+
     # Create a new module that has all the original attributes
     mock_basic = type('MockBasicModule', (), {})
     for attr_name in dir(real_basic):
         if not attr_name.startswith('__'):
             setattr(mock_basic, attr_name, getattr(real_basic, attr_name))
-    
+
     # Override only the problematic function
     mock_basic.is_executable = is_executable
-    
+
     # Replace the module in sys.modules
     sys.modules['ansible.module_utils.basic'] = mock_basic
 except ImportError:
@@ -87,7 +87,7 @@ class briefcase_ansible_test(toga.App):
         """Construct and show the Toga application."""
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
-        
+
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
 
@@ -106,7 +106,7 @@ class briefcase_ansible_test(toga.App):
             on_press=self.parse_ansible_inventory,
             style=Pack(margin=5)
         )
-        
+
         # Button to parse ansible playbook
         parse_playbook_button = toga.Button(
             'Parse Sample Playbook',
@@ -172,7 +172,6 @@ class briefcase_ansible_test(toga.App):
                     inventory_data = {'_meta': {'hostvars': {}}, 'all': {'children': []}}
 
                     # Build inventory structure
-                    host_groups = {}
                     for group_name in inventory.groups:
                         group = inventory.groups[group_name]
                         # Skip 'all' and 'ungrouped' special groups
@@ -210,7 +209,7 @@ class briefcase_ansible_test(toga.App):
         """Add text to the output view from any thread."""
         def update_ui():
             self.output_view.value += text
-        
+
         # If we're on the main thread, update directly
         if threading.current_thread() is threading.main_thread():
             update_ui()
@@ -220,12 +219,12 @@ class briefcase_ansible_test(toga.App):
                 self.output_view.value += text
             # Schedule it on the main event loop
             asyncio.run_coroutine_threadsafe(update_text(), self.main_event_loop)
-    
+
     def update_status(self, text):
         """Update the status label from any thread."""
         def update_ui():
             self.status_label.text = text
-        
+
         # If we're on the main thread, update directly
         if threading.current_thread() is threading.main_thread():
             update_ui()
@@ -235,20 +234,20 @@ class briefcase_ansible_test(toga.App):
                 self.status_label.text = text
             # Schedule it on the main event loop
             asyncio.run_coroutine_threadsafe(update_status_text(), self.main_event_loop)
-    
+
     def update_output_task(self, text):
         """Returns an async function that appends text to the output view."""
         async def update_output(interface):
             current_text = self.output_view.value
             self.output_view.value = current_text + text
         return update_output
-        
+
     def update_status_task(self, text):
         """Returns an async function that updates the status label."""
         async def update_status_async(interface):
             self.status_label.text = text
         return update_status_async
-        
+
     def parse_ansible_playbook(self, widget):
         """Parse the sample Ansible playbook file and display its JSON structure."""
         # Clear output and update status
@@ -260,18 +259,18 @@ class briefcase_ansible_test(toga.App):
             try:
                 # Path to the sample playbook file
                 playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
-                
-                self.add_text_to_output(f"Parsing file: sample_playbook.yml\n")
+
+                self.add_text_to_output("Parsing file: sample_playbook.yml\n")
 
                 # Use Ansible's data loader to parse the YAML file
                 loader = DataLoader()
-                
+
                 # Load the playbook file
                 playbook_data = loader.load_from_file(playbook_file)
-                
+
                 # Convert playbook data to JSON for display
                 playbook_json = json.dumps(playbook_data, indent=2)
-                
+
                 # Update the UI with the parsed playbook
                 self.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
 
