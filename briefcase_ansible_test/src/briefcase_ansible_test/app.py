@@ -5,7 +5,9 @@ A test to get ansible running in briefcase
 import os
 import toga
 from toga.style import Pack
-import ansible_runner
+import ansible
+import subprocess
+import threading
 
 # Define direction constants since they may not be available in the current Toga version
 COLUMN = "column"
@@ -122,19 +124,49 @@ class briefcase_ansible_test(toga.App):
         # Run in a background thread to keep the UI responsive
         def run_in_background():
             try:
-                r = ansible_runner.run(
-                    playbook=playbook,
-                    inventory=inventory if inventory else None,
-                    quiet=False,
-                    json_mode=True
+                # Construct path to ansible-playbook binary
+                # Path is relative to app_packages in the build environment
+                ansible_bin_path = os.path.join(self.paths.app, 'app_packages', 'bin', 'ansible-playbook')
+                
+                # Prepare command with arguments
+                cmd = [
+                    ansible_bin_path,
+                    '-i', inventory,
+                    playbook,
+                    '-v'  # verbose output
+                ]
+                
+                output = f"Executing: {' '.join(cmd)}\n\n"
+                
+                # Execute ansible-playbook command and capture output
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
                 )
-                output = f"Playbook completed with status: {r.status}\n"
-                output += f"Final return code: {r.rc}\n\n"
-
+                
+                # Capture output in real-time
+                for line in process.stdout:
+                    output += line
+                    
+                    # Update UI periodically with partial output
+                    def update_partial_output(current_output):
+                        self.output_view.value = current_output
+                    
+                    self.add_background_task(lambda: update_partial_output(output))
+                
+                # Wait for process to complete
+                return_code = process.wait()
+                
+                # Final output update
+                output += f"\nPlaybook completed with return code: {return_code}\n"
+                
                 # Update UI in the main thread
                 def update_ui():
                     self.output_view.value = output
-                    self.status_label.text = "Completed" if r.rc == 0 else "Failed"
+                    self.status_label.text = "Completed" if return_code == 0 else "Failed"
 
                 self.add_background_task(update_ui)
 
@@ -148,7 +180,10 @@ class briefcase_ansible_test(toga.App):
 
                 self.add_background_task(update_error)
 
-        self.add_background_task(run_in_background)
+        # Start the background thread for execution
+        thread = threading.Thread(target=run_in_background)
+        thread.daemon = True
+        thread.start()
 
 def main():
     return briefcase_ansible_test()
