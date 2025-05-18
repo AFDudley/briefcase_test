@@ -47,19 +47,35 @@ def is_executable(path):
     file_mode = os.stat(path).st_mode
     return (file_mode & stat.S_IXUSR) or path.endswith(('.sh', '.py', '.bin', '.exe'))
 
-# Monkey patch is_executable function before importing Ansible
-# The real function is defined in ansible/module_utils/basic.py
-# We can't use a simple module replacement since this is part of a larger module
-sys.modules['ansible.module_utils._text'] = type('MockTextModule', (), {'to_native': lambda x, errors='strict': str(x)})
+# Monkey patch text module before importing Ansible
+sys.modules['ansible.module_utils._text'] = type('MockTextModule', (), {
+    'to_native': lambda x, errors='strict': str(x),
+    'to_bytes': lambda obj, encoding='utf-8', errors='strict': obj.encode(encoding, errors) if isinstance(obj, str) else obj,
+    'to_text': lambda obj, encoding='utf-8', errors='strict': obj.decode(encoding, errors) if isinstance(obj, bytes) else str(obj)
+})
 
-# We'll define a fake module just for the specific function
-class MockBasicModule:
-    @staticmethod
-    def is_executable(path):
-        return is_executable(path)
-
-# Add our mock module to sys.modules
-sys.modules['ansible.module_utils.basic'] = MockBasicModule()
+# Import the real module and override only what's needed
+try:
+    # Import the real module to use most of its functionality
+    import ansible.module_utils.basic as real_basic
+    
+    # Create a new module that has all the original attributes
+    mock_basic = type('MockBasicModule', (), {})
+    for attr_name in dir(real_basic):
+        if not attr_name.startswith('__'):
+            setattr(mock_basic, attr_name, getattr(real_basic, attr_name))
+    
+    # Override only the problematic function
+    mock_basic.is_executable = is_executable
+    
+    # Replace the module in sys.modules
+    sys.modules['ansible.module_utils.basic'] = mock_basic
+except ImportError:
+    # Fall back to a simpler mock if the import fails
+    sys.modules['ansible.module_utils.basic'] = type('MockBasicModule', (), {
+        'is_executable': is_executable,
+        'json_dict_bytes_to_unicode': lambda d: d if isinstance(d, dict) else {}
+    })
 
 # Import Ansible modules directly - skip CLI
 from ansible.inventory.manager import InventoryManager
