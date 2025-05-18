@@ -23,6 +23,21 @@ def simple_getuser():
 # Replace getpass.getuser with our simple version
 getpass.getuser = simple_getuser
 
+# Create a fake pwd module for template/__init__.py
+class PwdModule:
+    class Struct:
+        def __init__(self, **entries):
+            self.__dict__.update(entries)
+    
+    def getpwuid(self, uid):
+        return self.Struct(pw_name='mobile')
+    
+    def getpwnam(self, name):
+        return self.Struct(pw_uid=0, pw_gid=0, pw_dir='/home/mobile')
+
+# Install the fake pwd module before Ansible imports
+sys.modules['pwd'] = PwdModule()
+
 # Create a patched version of is_executable for iOS
 def is_executable(path):
     # On iOS we can't execute files anyway, so we'll fake this
