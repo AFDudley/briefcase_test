@@ -17,56 +17,31 @@ class briefcase_ansible_test(toga.App):
         # Always assume mobile for iOS
         is_mobile = True
         
-        # Create playbook section
-        if is_mobile:
-            # Vertical layout for mobile
-            playbook_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
-            playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5))))
-            self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
-            file_box = toga.Box(style=Pack(direction=ROW))
-            file_box.add(self.playbook_path)
-            playbook_button = toga.Button('...', on_press=self.select_playbook, style=Pack(width=40))
-            file_box.add(playbook_button)
-            playbook_box.add(file_box)
-        else:
-            # Horizontal layout for desktop
-            playbook_box = toga.Box(style=Pack(direction=ROW, margin=5))
-            playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5), width=70)))
-            self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=250))
-            playbook_box.add(self.playbook_path)
-            playbook_button = toga.Button('Browse...', on_press=self.select_playbook)
-            playbook_box.add(playbook_button)
-        
-        # Create inventory section
-        if is_mobile:
-            # Vertical layout for mobile
-            inventory_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
-            inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5))))
-            self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
-            file_box = toga.Box(style=Pack(direction=ROW))
-            file_box.add(self.inventory_path)
-            inventory_button = toga.Button('...', on_press=self.select_inventory, style=Pack(width=40))
-            file_box.add(inventory_button)
-            inventory_box.add(file_box)
-        else:
-            # Horizontal layout for desktop
-            inventory_box = toga.Box(style=Pack(direction=ROW, margin=5))
-            inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5), width=70)))
-            self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=250))
-            inventory_box.add(self.inventory_path)
-            inventory_button = toga.Button('Browse...', on_press=self.select_inventory)
-            inventory_box.add(inventory_button)
-        
-        # Create default playbooks directory
+        # Create default playbooks directory and sample files
         self.playbooks_dir = os.path.join(self.paths.app, 'playbooks')
         self.inventory_dir = os.path.join(self.paths.app, 'inventory')
-        
         # Create directories if they don't exist
         os.makedirs(self.playbooks_dir, exist_ok=True)
         os.makedirs(self.inventory_dir, exist_ok=True)
-        
-        # Create a sample playbook and inventory if they don't exist
+        # Create sample files
         self.create_sample_files()
+        
+        # Create file path displays
+        # Playbook section
+        playbook_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
+        playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5))))
+        self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
+        playbook_box.add(self.playbook_path)
+        
+        # Inventory section
+        inventory_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
+        inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5))))
+        self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
+        inventory_box.add(self.inventory_path)
+        
+        # Pre-select sample files
+        self.playbook_path.value = os.path.join(self.playbooks_dir, 'sample_playbook.yml')
+        self.inventory_path.value = os.path.join(self.inventory_dir, 'sample_inventory.ini')
         
         # Run button (smaller on mobile)
         if is_mobile:
@@ -125,45 +100,18 @@ localhost ansible_connection=local
 """)
     
     def select_playbook(self, widget):
-        """Select a playbook file"""
+        """Use the sample playbook file"""
         try:
-            # For iOS, use a selection instead of a file dialog
-            playbook_files = self.find_playbook_files()
+            # Use the sample playbook
+            sample_playbook_path = os.path.join(self.playbooks_dir, 'sample_playbook.yml')
             
-            if not playbook_files:
-                self.status_label.text = "No playbook files found"
-                return
+            # Ensure the sample file exists
+            if not os.path.exists(sample_playbook_path):
+                self.create_sample_files()
                 
-            # Create selection dialog with playbook files
-            items = playbook_files
-            selection = toga.Selection(items=items, on_select=self.on_playbook_selected)
-            
-            # Create a dialog to show the selection
-            dialog_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
-            dialog_box.add(toga.Label("Select Playbook:", style=Pack(margin=5)))
-            dialog_box.add(selection)
-            
-            # Add a button to close the dialog
-            button_box = toga.Box(style=Pack(direction=ROW, margin=5))
-            cancel_button = toga.Button(
-                "Cancel", 
-                on_press=lambda w: self.close_selection_dialog(),
-                style=Pack(flex=1, margin=5)
-            )
-            select_button = toga.Button(
-                "Select", 
-                on_press=lambda w: self.handle_playbook_selection(selection.value),
-                style=Pack(flex=1, margin=5)
-            )
-            button_box.add(cancel_button)
-            button_box.add(select_button)
-            dialog_box.add(button_box)
-            
-            # Show as a new window
-            self.selection_window = toga.Window(title="Select Playbook", size=(350, 300))
-            self.selection_window.content = dialog_box
-            self.selection_window.show()
-            
+            # Set the playbook path
+            self.playbook_path.value = sample_playbook_path
+            self.status_label.text = "Using sample playbook"
         except Exception as e:
             self.status_label.text = f"Error selecting playbook: {str(e)}"
     
@@ -204,45 +152,18 @@ localhost ansible_connection=local
             self.playbook_path.value = full_path
     
     def select_inventory(self, widget):
-        """Select an inventory file"""
+        """Use the sample inventory file"""
         try:
-            # For iOS, use a selection instead of a file dialog
-            inventory_files = self.find_inventory_files()
+            # Use the sample inventory
+            sample_inventory_path = os.path.join(self.inventory_dir, 'sample_inventory.ini')
             
-            if not inventory_files:
-                self.status_label.text = "No inventory files found"
-                return
+            # Ensure the sample file exists
+            if not os.path.exists(sample_inventory_path):
+                self.create_sample_files()
                 
-            # Create selection dialog with inventory files
-            items = inventory_files
-            selection = toga.Selection(items=items, on_select=self.on_inventory_selected)
-            
-            # Create a dialog to show the selection
-            dialog_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
-            dialog_box.add(toga.Label("Select Inventory:", style=Pack(margin=5)))
-            dialog_box.add(selection)
-            
-            # Add a button to close the dialog
-            button_box = toga.Box(style=Pack(direction=ROW, margin=5))
-            cancel_button = toga.Button(
-                "Cancel", 
-                on_press=lambda w: self.close_inventory_dialog(),
-                style=Pack(flex=1, margin=5)
-            )
-            select_button = toga.Button(
-                "Select", 
-                on_press=lambda w: self.handle_inventory_selection(selection.value),
-                style=Pack(flex=1, margin=5)
-            )
-            button_box.add(cancel_button)
-            button_box.add(select_button)
-            dialog_box.add(button_box)
-            
-            # Show as a new window
-            self.inventory_window = toga.Window(title="Select Inventory", size=(350, 300))
-            self.inventory_window.content = dialog_box
-            self.inventory_window.show()
-            
+            # Set the inventory path
+            self.inventory_path.value = sample_inventory_path
+            self.status_label.text = "Using sample inventory"
         except Exception as e:
             self.status_label.text = f"Error selecting inventory: {str(e)}"
     
