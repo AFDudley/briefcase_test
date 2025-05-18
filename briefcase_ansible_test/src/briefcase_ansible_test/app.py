@@ -125,38 +125,144 @@ localhost ansible_connection=local
 """)
     
     def select_playbook(self, widget):
-        """Open a file dialog to select a playbook file"""
+        """Select a playbook file"""
         try:
-            dialog = toga.OpenFileDialog(
-                title="Select Playbook",
-                initial_directory=self.playbooks_dir,
-                file_types=[('YAML Files', '*.yml'), ('YAML Files', '*.yaml'), ('All Files', '*')]
+            # For iOS, use a selection instead of a file dialog
+            playbook_files = self.find_playbook_files()
+            
+            if not playbook_files:
+                self.status_label.text = "No playbook files found"
+                return
+                
+            # Create selection dialog with playbook files
+            items = playbook_files
+            selection = toga.Selection(items=items, on_select=self.on_playbook_selected)
+            
+            # Create a dialog to show the selection
+            dialog_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+            dialog_box.add(toga.Label("Select Playbook:", style=Pack(margin=5)))
+            dialog_box.add(selection)
+            
+            # Add a button to close the dialog
+            button_box = toga.Box(style=Pack(direction=ROW, margin=5))
+            cancel_button = toga.Button(
+                "Cancel", 
+                on_press=lambda w: self.close_selection_dialog(),
+                style=Pack(flex=1, margin=5)
             )
-            self.main_window.dialog(dialog, self.on_playbook_select)
+            select_button = toga.Button(
+                "Select", 
+                on_press=lambda w: self.handle_playbook_selection(selection.value),
+                style=Pack(flex=1, margin=5)
+            )
+            button_box.add(cancel_button)
+            button_box.add(select_button)
+            dialog_box.add(button_box)
+            
+            # Show as a new window
+            self.selection_window = toga.Window(title="Select Playbook", size=(350, 300))
+            self.selection_window.content = dialog_box
+            self.selection_window.show()
+            
         except Exception as e:
             self.status_label.text = f"Error selecting playbook: {str(e)}"
-            
-    def on_playbook_select(self, dialog, result):
-        """Handle playbook selection result"""
-        if result:
-            self.playbook_path.value = result
+    
+    def find_playbook_files(self):
+        """Find all playbook files in the playbooks directory"""
+        files = []
+        if os.path.exists(self.playbooks_dir):
+            for file in os.listdir(self.playbooks_dir):
+                if file.endswith('.yml') or file.endswith('.yaml'):
+                    files.append(file)
+        return files
+    
+    def find_inventory_files(self):
+        """Find all inventory files in the inventory directory"""
+        files = []
+        if os.path.exists(self.inventory_dir):
+            for file in os.listdir(self.inventory_dir):
+                if file.endswith('.ini'):
+                    files.append(file)
+        return files
+    
+    def close_selection_dialog(self):
+        """Close the selection dialog window"""
+        if hasattr(self, 'selection_window') and self.selection_window:
+            self.selection_window.close()
+    
+    def handle_playbook_selection(self, filename):
+        """Handle playbook selection from dialog"""
+        if filename:
+            full_path = os.path.join(self.playbooks_dir, filename)
+            self.playbook_path.value = full_path
+        self.close_selection_dialog()
+    
+    def on_playbook_selected(self, selection):
+        """Handle selection of playbook from dropdown"""
+        if selection.value:
+            full_path = os.path.join(self.playbooks_dir, selection.value)
+            self.playbook_path.value = full_path
     
     def select_inventory(self, widget):
-        """Open a file dialog to select an inventory file"""
+        """Select an inventory file"""
         try:
-            dialog = toga.OpenFileDialog(
-                title="Select Inventory",
-                initial_directory=self.inventory_dir,
-                file_types=[('Inventory Files', '*.ini'), ('All Files', '*')]
+            # For iOS, use a selection instead of a file dialog
+            inventory_files = self.find_inventory_files()
+            
+            if not inventory_files:
+                self.status_label.text = "No inventory files found"
+                return
+                
+            # Create selection dialog with inventory files
+            items = inventory_files
+            selection = toga.Selection(items=items, on_select=self.on_inventory_selected)
+            
+            # Create a dialog to show the selection
+            dialog_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
+            dialog_box.add(toga.Label("Select Inventory:", style=Pack(margin=5)))
+            dialog_box.add(selection)
+            
+            # Add a button to close the dialog
+            button_box = toga.Box(style=Pack(direction=ROW, margin=5))
+            cancel_button = toga.Button(
+                "Cancel", 
+                on_press=lambda w: self.close_inventory_dialog(),
+                style=Pack(flex=1, margin=5)
             )
-            self.main_window.dialog(dialog, self.on_inventory_select)
+            select_button = toga.Button(
+                "Select", 
+                on_press=lambda w: self.handle_inventory_selection(selection.value),
+                style=Pack(flex=1, margin=5)
+            )
+            button_box.add(cancel_button)
+            button_box.add(select_button)
+            dialog_box.add(button_box)
+            
+            # Show as a new window
+            self.inventory_window = toga.Window(title="Select Inventory", size=(350, 300))
+            self.inventory_window.content = dialog_box
+            self.inventory_window.show()
+            
         except Exception as e:
             self.status_label.text = f"Error selecting inventory: {str(e)}"
-            
-    def on_inventory_select(self, dialog, result):
-        """Handle inventory selection result"""
-        if result:
-            self.inventory_path.value = result
+    
+    def close_inventory_dialog(self):
+        """Close the inventory selection dialog window"""
+        if hasattr(self, 'inventory_window') and self.inventory_window:
+            self.inventory_window.close()
+    
+    def handle_inventory_selection(self, filename):
+        """Handle inventory selection from dialog"""
+        if filename:
+            full_path = os.path.join(self.inventory_dir, filename)
+            self.inventory_path.value = full_path
+        self.close_inventory_dialog()
+    
+    def on_inventory_selected(self, selection):
+        """Handle selection of inventory from dropdown"""
+        if selection.value:
+            full_path = os.path.join(self.inventory_dir, selection.value)
+            self.inventory_path.value = full_path
     
     def run_playbook(self, widget):
         """Run the specified Ansible playbook"""
