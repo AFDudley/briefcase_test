@@ -113,6 +113,20 @@ class briefcase_ansible_test(toga.App):
             on_press=self.parse_ansible_playbook,
             style=Pack(margin=5)
         )
+        
+        # Button to test Paramiko SSH
+        test_paramiko_button = toga.Button(
+            'Test Paramiko',
+            on_press=self.test_paramiko_connection,
+            style=Pack(margin=5)
+        )
+        
+        # Button to run the sample playbook with Paramiko
+        run_playbook_button = toga.Button(
+            'Run Playbook (Paramiko)',
+            on_press=self.run_ansible_playbook,
+            style=Pack(margin=5)
+        )
 
         # Output area
         self.output_view = toga.MultilineTextInput(
@@ -130,6 +144,8 @@ class briefcase_ansible_test(toga.App):
         main_box.add(title_label)
         main_box.add(run_button)
         main_box.add(parse_playbook_button)
+        main_box.add(test_paramiko_button)
+        main_box.add(run_playbook_button)
         main_box.add(self.output_view)
         main_box.add(self.status_label)
 
@@ -284,6 +300,228 @@ class briefcase_ansible_test(toga.App):
                 self.add_text_to_output(f"Error parsing playbook: {error_message}")
                 self.update_status("Error")
 
+        # Start background thread
+        thread = threading.Thread(target=run_in_background)
+        thread.daemon = True
+        thread.start()
+        
+    def test_paramiko_connection(self, widget):
+        """Test a basic Paramiko SSH connection."""
+        # Clear output and update status
+        self.output_view.value = ""
+        self.status_label.text = "Testing Paramiko connection..."
+        
+        # Run in a background thread to keep UI responsive
+        def run_in_background():
+            try:
+                import paramiko
+                
+                self.add_text_to_output("Paramiko version: " + paramiko.__version__ + "\n")
+                self.add_text_to_output("Initializing SSH client...\n")
+                
+                # Create a client instance
+                client = paramiko.SSHClient()
+                
+                # Auto-accept host keys
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                
+                # Connection parameters - using localhost for testing
+                hostname = '127.0.0.1'
+                username = 'mobile'  # Use a default username
+                port = 22
+                
+                # For testing, we'll just attempt the connection but not authenticate
+                # This will test if Paramiko can create a socket connection
+                self.add_text_to_output(f"Connecting to {hostname}:{port} as {username}...\n")
+                
+                try:
+                    # Try to connect with a short timeout
+                    # We expect this to fail due to authentication, but it will show
+                    # that the basic socket connection works
+                    client.connect(
+                        hostname=hostname,
+                        username=username,
+                        port=port,
+                        timeout=2,
+                        allow_agent=False,
+                        look_for_keys=False
+                    )
+                    
+                    self.add_text_to_output("Connection successful! This is unexpected.\n")
+                    client.close()
+                    
+                except paramiko.AuthenticationException:
+                    # This is actually good - means the socket connection worked
+                    # but authentication failed as expected
+                    self.add_text_to_output("Authentication failed as expected. Socket connection works!\n")
+                    self.add_text_to_output("✅ Paramiko is working correctly.\n")
+                    
+                except paramiko.SSHException as e:
+                    # This might still be okay depending on the error
+                    self.add_text_to_output(f"SSH error: {str(e)}\n")
+                    if "banner exchange" in str(e).lower():
+                        self.add_text_to_output("✅ Banner exchange attempted! Paramiko is working.\n")
+                    else:
+                        self.add_text_to_output("⚠️ SSH negotiation failed, but socket connection may still be working.\n")
+                        
+                except Exception as e:
+                    # Other connection errors
+                    self.add_text_to_output(f"Connection error: {str(e)}\n")
+                    self.add_text_to_output("❌ Socket connection failed.\n")
+                
+                # Additional tests to check if Paramiko can generate keys
+                self.add_text_to_output("\nTesting key generation capability...\n")
+                
+                try:
+                    # Generate a small test key
+                    key = paramiko.RSAKey.generate(bits=1024)
+                    self.add_text_to_output(f"✅ Generated RSA key: {key.get_fingerprint().hex()}\n")
+                except Exception as e:
+                    self.add_text_to_output(f"❌ Key generation failed: {str(e)}\n")
+                
+                self.update_status("Completed")
+                
+            except ImportError as e:
+                self.add_text_to_output(f"Error importing Paramiko: {str(e)}\n")
+                self.add_text_to_output("❌ Paramiko is not available in this environment.\n")
+                self.update_status("Failed")
+                
+            except Exception as e:
+                # Handle any other exceptions
+                self.add_text_to_output(f"Unexpected error: {str(e)}\n")
+                self.update_status("Error")
+        
+        # Start background thread
+        thread = threading.Thread(target=run_in_background)
+        thread.daemon = True
+        thread.start()
+        
+    def run_ansible_playbook(self, widget):
+        """Run the sample Ansible playbook using Paramiko for SSH connections."""
+        # Clear output and update status
+        self.output_view.value = ""
+        self.status_label.text = "Running sample playbook..."
+        
+        # Run in a background thread to keep UI responsive
+        def run_in_background():
+            try:
+                # Path to the files
+                inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
+                playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
+                
+                self.add_text_to_output(f"Loading inventory: sample_inventory.ini\n")
+                self.add_text_to_output(f"Loading playbook: sample_playbook.yml\n")
+                
+                # Create data loader
+                loader = DataLoader()
+                
+                # Set up inventory
+                inventory = InventoryManager(loader=loader, sources=[inventory_file])
+                
+                # Set up variable manager
+                from ansible.vars.manager import VariableManager
+                variable_manager = VariableManager(loader=loader, inventory=inventory)
+                
+                # Configure connection to use paramiko
+                self.add_text_to_output("Configuring Ansible to use Paramiko SSH connections\n")
+                
+                # Define a subclass of CallbackBase to capture output
+                from ansible.plugins.callback import CallbackBase
+                
+                class ResultCallback(CallbackBase):
+                    def __init__(self, output_callback):
+                        super(ResultCallback, self).__init__()
+                        self.output_callback = output_callback
+                        
+                    def v2_runner_on_ok(self, result):
+                        host = result._host.get_name()
+                        task = result._task.get_name()
+                        self.output_callback(f"✅ {host} | {task} => SUCCESS\n")
+                        if 'msg' in result._result:
+                            self.output_callback(f"   Message: {result._result['msg']}\n")
+                            
+                    def v2_runner_on_failed(self, result, ignore_errors=False):
+                        host = result._host.get_name()
+                        task = result._task.get_name()
+                        self.output_callback(f"❌ {host} | {task} => FAILED\n")
+                        if 'msg' in result._result:
+                            self.output_callback(f"   Error: {result._result['msg']}\n")
+                            
+                    def v2_runner_on_unreachable(self, result):
+                        host = result._host.get_name()
+                        self.output_callback(f"🔌 {host} => UNREACHABLE\n")
+                            
+                    def v2_playbook_on_play_start(self, play):
+                        name = play.get_name()
+                        self.output_callback(f"▶️ Starting play: {name}\n")
+                            
+                    def v2_playbook_on_task_start(self, task, is_conditional):
+                        name = task.get_name()
+                        self.output_callback(f"⏳ Running task: {name}\n")
+                
+                # Create a custom callback to receive events
+                results_callback = ResultCallback(self.add_text_to_output)
+                
+                # Create options for playbook execution
+                from ansible import constants as C
+                from ansible.executor.playbook_executor import PlaybookExecutor
+                
+                options = type('Options', (), {
+                    'connection': 'paramiko',    # Use paramiko for SSH connections
+                    'module_path': None,
+                    'forks': 1,                  # Run tasks serially
+                    'become': None,
+                    'become_method': None,
+                    'become_user': None,
+                    'check': False,              # Don't perform a dry-run
+                    'syntax': False,             # Don't just check syntax
+                    'diff': False,               # Don't show file diffs
+                    'verbosity': 0,              # Minimal output
+                    'listhosts': False,
+                    'listtasks': False,
+                    'listtags': False,
+                    'ssh_common_args': '',
+                    'ssh_extra_args': '',
+                    'sftp_extra_args': '',
+                    'scp_extra_args': '',
+                    'become_ask_pass': False,
+                    'remote_user': None,
+                    'host_key_checking': False   # Disable host key checking
+                })()
+                
+                self.add_text_to_output("Setting up playbook executor...\n")
+                
+                # Create playbook executor
+                pbex = PlaybookExecutor(
+                    playbooks=[playbook_file],
+                    inventory=inventory,
+                    variable_manager=variable_manager,
+                    loader=loader,
+                    options=options,
+                    passwords={}
+                )
+                
+                # Register our callback
+                pbex._tqm._stdout_callback = results_callback
+                
+                self.add_text_to_output("Starting playbook execution with Paramiko transport...\n\n")
+                
+                # Run the playbook
+                result = pbex.run()
+                
+                if result == 0:
+                    self.add_text_to_output("\n✨ Playbook execution completed successfully.\n")
+                    self.update_status("Completed")
+                else:
+                    self.add_text_to_output(f"\n⚠️ Playbook execution failed with code {result}.\n")
+                    self.update_status("Failed")
+                    
+            except Exception as error:
+                # Handle any exceptions
+                error_message = str(error)
+                self.add_text_to_output(f"Error executing playbook: {error_message}")
+                self.update_status("Error")
+        
         # Start background thread
         thread = threading.Thread(target=run_in_background)
         thread.daemon = True
