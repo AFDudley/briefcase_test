@@ -106,6 +106,13 @@ class briefcase_ansible_test(toga.App):
             on_press=self.parse_ansible_inventory,
             style=Pack(margin=5)
         )
+        
+        # Button to parse ansible playbook
+        parse_playbook_button = toga.Button(
+            'Parse Sample Playbook',
+            on_press=self.parse_ansible_playbook,
+            style=Pack(margin=5)
+        )
 
         # Output area
         self.output_view = toga.MultilineTextInput(
@@ -122,6 +129,7 @@ class briefcase_ansible_test(toga.App):
         # Add components to main box
         main_box.add(title_label)
         main_box.add(run_button)
+        main_box.add(parse_playbook_button)
         main_box.add(self.output_view)
         main_box.add(self.status_label)
 
@@ -240,6 +248,47 @@ class briefcase_ansible_test(toga.App):
         async def update_status_async(interface):
             self.status_label.text = text
         return update_status_async
+        
+    def parse_ansible_playbook(self, widget):
+        """Parse the sample Ansible playbook file and display its JSON structure."""
+        # Clear output and update status
+        self.output_view.value = ""
+        self.status_label.text = "Parsing sample playbook..."
+
+        # Run in a background thread to keep UI responsive
+        def run_in_background():
+            try:
+                # Path to the sample playbook file
+                playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
+                
+                self.add_text_to_output(f"Parsing file: sample_playbook.yml\n")
+
+                # Use Ansible's data loader to parse the YAML file
+                loader = DataLoader()
+                
+                # Load the playbook file
+                playbook_data = loader.load_from_file(playbook_file)
+                
+                # Convert playbook data to JSON for display
+                playbook_json = json.dumps(playbook_data, indent=2)
+                
+                # Update the UI with the parsed playbook
+                self.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
+
+                # Final update when everything is done
+                self.add_text_to_output("Playbook parsing completed successfully.\n")
+                self.update_status("Completed")
+
+            except Exception as error:
+                # Handle any exceptions
+                error_message = str(error)
+                self.add_text_to_output(f"Error parsing playbook: {error_message}")
+                self.update_status("Error")
+
+        # Start background thread
+        thread = threading.Thread(target=run_in_background)
+        thread.daemon = True
+        thread.start()
 
 
 def main():
