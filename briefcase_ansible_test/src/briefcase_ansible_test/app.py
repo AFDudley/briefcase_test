@@ -91,6 +91,9 @@ class briefcase_ansible_test(toga.App):
         """Construct and show the Toga application."""
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
+        
+        # Store a reference to the main event loop for background threads
+        self.main_event_loop = asyncio.get_event_loop()
 
         # Create main box with vertical layout
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
@@ -208,9 +211,8 @@ class briefcase_ansible_test(toga.App):
         if threading.current_thread() is threading.main_thread():
             update_ui()
         else:
-            # Otherwise, schedule the update on the main thread using the event loop
-            loop = asyncio.get_event_loop()
-            asyncio.run_coroutine_threadsafe(self.update_output_task(text), loop)
+            # Use the stored reference to the main event loop
+            asyncio.run_coroutine_threadsafe(self.update_output_task(text), self.main_event_loop)
     
     def update_status(self, text):
         """Update the status label from any thread."""
@@ -221,9 +223,8 @@ class briefcase_ansible_test(toga.App):
         if threading.current_thread() is threading.main_thread():
             update_ui()
         else:
-            # Otherwise, schedule the update on the main thread using the event loop
-            loop = asyncio.get_event_loop()
-            asyncio.run_coroutine_threadsafe(self.update_status_task(text), loop)
+            # Use the stored reference to the main event loop
+            asyncio.run_coroutine_threadsafe(self.update_status_task(text), self.main_event_loop)
     
     def update_output_task(self, text):
         """Returns an async function that appends text to the output view."""
