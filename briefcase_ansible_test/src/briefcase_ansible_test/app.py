@@ -14,21 +14,48 @@ class briefcase_ansible_test(toga.App):
         # Create main box with vertical layout
         main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
         
+        # Always assume mobile for iOS
+        is_mobile = True
+        
         # Create playbook section
-        playbook_box = toga.Box(style=Pack(direction=ROW, margin=5))
-        playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5))))
-        self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1))
-        playbook_box.add(self.playbook_path)
-        playbook_button = toga.Button('Browse...', on_press=self.select_playbook)
-        playbook_box.add(playbook_button)
+        if is_mobile:
+            # Vertical layout for mobile
+            playbook_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
+            playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5))))
+            self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
+            file_box = toga.Box(style=Pack(direction=ROW))
+            file_box.add(self.playbook_path)
+            playbook_button = toga.Button('...', on_press=self.select_playbook, style=Pack(width=40))
+            file_box.add(playbook_button)
+            playbook_box.add(file_box)
+        else:
+            # Horizontal layout for desktop
+            playbook_box = toga.Box(style=Pack(direction=ROW, margin=5))
+            playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5), width=70)))
+            self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=250))
+            playbook_box.add(self.playbook_path)
+            playbook_button = toga.Button('Browse...', on_press=self.select_playbook)
+            playbook_box.add(playbook_button)
         
         # Create inventory section
-        inventory_box = toga.Box(style=Pack(direction=ROW, margin=5))
-        inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5))))
-        self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1))
-        inventory_box.add(self.inventory_path)
-        inventory_button = toga.Button('Browse...', on_press=self.select_inventory)
-        inventory_box.add(inventory_button)
+        if is_mobile:
+            # Vertical layout for mobile
+            inventory_box = toga.Box(style=Pack(direction=COLUMN, margin=5))
+            inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5))))
+            self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=300))
+            file_box = toga.Box(style=Pack(direction=ROW))
+            file_box.add(self.inventory_path)
+            inventory_button = toga.Button('...', on_press=self.select_inventory, style=Pack(width=40))
+            file_box.add(inventory_button)
+            inventory_box.add(file_box)
+        else:
+            # Horizontal layout for desktop
+            inventory_box = toga.Box(style=Pack(direction=ROW, margin=5))
+            inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5), width=70)))
+            self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1, width=250))
+            inventory_box.add(self.inventory_path)
+            inventory_button = toga.Button('Browse...', on_press=self.select_inventory)
+            inventory_box.add(inventory_button)
         
         # Create default playbooks directory
         self.playbooks_dir = os.path.join(self.paths.app, 'playbooks')
@@ -41,24 +68,36 @@ class briefcase_ansible_test(toga.App):
         # Create a sample playbook and inventory if they don't exist
         self.create_sample_files()
         
-        # Run button
-        run_button = toga.Button('Run Playbook', on_press=self.run_playbook, style=Pack(margin=5))
+        # Run button (smaller on mobile)
+        if is_mobile:
+            run_button = toga.Button('Run', on_press=self.run_playbook, style=Pack(margin=5))
+        else:
+            run_button = toga.Button('Run Playbook', on_press=self.run_playbook, style=Pack(margin=5))
         
         # Status and output
         self.status_label = toga.Label('Ready', style=Pack(margin=5))
-        self.output_view = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, margin=5))
+        self.output_view = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, margin=5, height=200))
         
-        # Add components to main box
-        main_box.add(toga.Label('Ansible Runner', style=Pack(text_align='center', font_size=16, margin=10)))
+        # Set up the main window first to allow proper size detection
+        self.main_window = toga.MainWindow(title=self.formal_name)
+        
+        # Add components to main box - adjust based on mobile vs desktop
+        title = 'Ansible' if is_mobile else 'Ansible Runner'
+        main_box.add(toga.Label(title, style=Pack(text_align='center', font_size=16 if is_mobile else 18, margin=5)))
         main_box.add(playbook_box)
         main_box.add(inventory_box)
         main_box.add(run_button)
         main_box.add(self.status_label)
         main_box.add(self.output_view)
         
-        # Set up the main window
-        self.main_window = toga.MainWindow(title=self.formal_name)
+        # Apply content and show window
         self.main_window.content = main_box
+        
+        # Set a maximum size for mobile
+        if is_mobile:
+            # Set explicit size to fit in iOS simulator viewport
+            self.main_window.size = (380, 600)
+            
         self.main_window.show()
     
     def create_sample_files(self):
@@ -88,28 +127,36 @@ localhost ansible_connection=local
     def select_playbook(self, widget):
         """Open a file dialog to select a playbook file"""
         try:
-            playbook_file = self.main_window.open_file_dialog(
+            dialog = toga.OpenFileDialog(
                 title="Select Playbook",
                 initial_directory=self.playbooks_dir,
                 file_types=[('YAML Files', '*.yml'), ('YAML Files', '*.yaml'), ('All Files', '*')]
             )
-            if playbook_file:
-                self.playbook_path.value = playbook_file
+            self.main_window.dialog(dialog, self.on_playbook_select)
         except Exception as e:
             self.status_label.text = f"Error selecting playbook: {str(e)}"
+            
+    def on_playbook_select(self, dialog, result):
+        """Handle playbook selection result"""
+        if result:
+            self.playbook_path.value = result
     
     def select_inventory(self, widget):
         """Open a file dialog to select an inventory file"""
         try:
-            inventory_file = self.main_window.open_file_dialog(
+            dialog = toga.OpenFileDialog(
                 title="Select Inventory",
                 initial_directory=self.inventory_dir,
                 file_types=[('Inventory Files', '*.ini'), ('All Files', '*')]
             )
-            if inventory_file:
-                self.inventory_path.value = inventory_file
+            self.main_window.dialog(dialog, self.on_inventory_select)
         except Exception as e:
             self.status_label.text = f"Error selecting inventory: {str(e)}"
+            
+    def on_inventory_select(self, dialog, result):
+        """Handle inventory selection result"""
+        if result:
+            self.inventory_path.value = result
     
     def run_playbook(self, widget):
         """Run the specified Ansible playbook"""
