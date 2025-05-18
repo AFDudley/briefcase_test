@@ -188,7 +188,7 @@ class briefcase_ansible_test(toga.App):
 
     def update_output_task(self, text):
         """Returns an async function that appends text to the output view."""
-        async def update_output():
+        async def update_output(interface):
             current_text = self.output_view.value
             self.output_view.value = current_text + text
         return update_output
