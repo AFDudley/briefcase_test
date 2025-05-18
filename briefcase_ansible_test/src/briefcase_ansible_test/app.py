@@ -211,8 +211,11 @@ class briefcase_ansible_test(toga.App):
         if threading.current_thread() is threading.main_thread():
             update_ui()
         else:
-            # Use the stored reference to the main event loop
-            asyncio.run_coroutine_threadsafe(self.update_output_task(text), self.main_event_loop)
+            # Create a direct coroutine for updating the text
+            async def update_text():
+                self.output_view.value += text
+            # Schedule it on the main event loop
+            asyncio.run_coroutine_threadsafe(update_text(), self.main_event_loop)
     
     def update_status(self, text):
         """Update the status label from any thread."""
@@ -223,8 +226,11 @@ class briefcase_ansible_test(toga.App):
         if threading.current_thread() is threading.main_thread():
             update_ui()
         else:
-            # Use the stored reference to the main event loop
-            asyncio.run_coroutine_threadsafe(self.update_status_task(text), self.main_event_loop)
+            # Create a direct coroutine for updating the status
+            async def update_status_text():
+                self.status_label.text = text
+            # Schedule it on the main event loop
+            asyncio.run_coroutine_threadsafe(update_status_text(), self.main_event_loop)
     
     def update_output_task(self, text):
         """Returns an async function that appends text to the output view."""
