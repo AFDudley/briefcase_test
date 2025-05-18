@@ -12,19 +12,19 @@ class briefcase_ansible_test(toga.App):
     def startup(self):
         """Construct and show the Toga application with Ansible functionality."""
         # Create main box with vertical layout
-        main_box = toga.Box(style=Pack(direction=COLUMN, padding=10))
+        main_box = toga.Box(style=Pack(direction=COLUMN, margin=10))
         
         # Create playbook section
-        playbook_box = toga.Box(style=Pack(direction=ROW, padding=5))
-        playbook_box.add(toga.Label('Playbook:', style=Pack(padding=(0, 5))))
+        playbook_box = toga.Box(style=Pack(direction=ROW, margin=5))
+        playbook_box.add(toga.Label('Playbook:', style=Pack(margin=(0, 5))))
         self.playbook_path = toga.TextInput(readonly=True, style=Pack(flex=1))
         playbook_box.add(self.playbook_path)
         playbook_button = toga.Button('Browse...', on_press=self.select_playbook)
         playbook_box.add(playbook_button)
         
         # Create inventory section
-        inventory_box = toga.Box(style=Pack(direction=ROW, padding=5))
-        inventory_box.add(toga.Label('Inventory:', style=Pack(padding=(0, 5))))
+        inventory_box = toga.Box(style=Pack(direction=ROW, margin=5))
+        inventory_box.add(toga.Label('Inventory:', style=Pack(margin=(0, 5))))
         self.inventory_path = toga.TextInput(readonly=True, style=Pack(flex=1))
         inventory_box.add(self.inventory_path)
         inventory_button = toga.Button('Browse...', on_press=self.select_inventory)
@@ -42,14 +42,14 @@ class briefcase_ansible_test(toga.App):
         self.create_sample_files()
         
         # Run button
-        run_button = toga.Button('Run Playbook', on_press=self.run_playbook, style=Pack(padding=5))
+        run_button = toga.Button('Run Playbook', on_press=self.run_playbook, style=Pack(margin=5))
         
         # Status and output
-        self.status_label = toga.Label('Ready', style=Pack(padding=5))
-        self.output_view = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, padding=5))
+        self.status_label = toga.Label('Ready', style=Pack(margin=5))
+        self.output_view = toga.MultilineTextInput(readonly=True, style=Pack(flex=1, margin=5))
         
         # Add components to main box
-        main_box.add(toga.Label('Ansible Runner', style=Pack(text_align='center', font_size=16, padding=10)))
+        main_box.add(toga.Label('Ansible Runner', style=Pack(text_align='center', font_size=16, margin=10)))
         main_box.add(playbook_box)
         main_box.add(inventory_box)
         main_box.add(run_button)
