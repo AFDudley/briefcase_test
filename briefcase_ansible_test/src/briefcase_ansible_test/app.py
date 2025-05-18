@@ -10,6 +10,7 @@ import threading
 import asyncio
 import json
 import getpass
+import stat
 
 # Create a simple getuser replacement that doesn't need pwd module
 def simple_getuser():
@@ -21,6 +22,29 @@ def simple_getuser():
 
 # Replace getpass.getuser with our simple version
 getpass.getuser = simple_getuser
+
+# Create a patched version of is_executable for iOS
+def is_executable(path):
+    # On iOS we can't execute files anyway, so we'll fake this
+    # based on the file extension and permissions
+    if not os.path.exists(path):
+        return False
+    file_mode = os.stat(path).st_mode
+    return (file_mode & stat.S_IXUSR) or path.endswith(('.sh', '.py', '.bin', '.exe'))
+
+# Monkey patch is_executable function before importing Ansible
+# The real function is defined in ansible/module_utils/basic.py
+# We can't use a simple module replacement since this is part of a larger module
+sys.modules['ansible.module_utils._text'] = type('MockTextModule', (), {'to_native': lambda x, errors='strict': str(x)})
+
+# We'll define a fake module just for the specific function
+class MockBasicModule:
+    @staticmethod
+    def is_executable(path):
+        return is_executable(path)
+
+# Add our mock module to sys.modules
+sys.modules['ansible.module_utils.basic'] = MockBasicModule()
 
 # Import Ansible modules directly - skip CLI
 from ansible.inventory.manager import InventoryManager
