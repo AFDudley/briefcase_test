@@ -50,54 +50,8 @@ class briefcase_ansible_test(toga.App):
             style=Pack(text_align='center', font_size=16, margin=5)
         )
 
-        # Button to parse ansible inventory
-        run_button = toga.Button(
-            'Parse Ansible Inventory',
-            on_press=self.parse_ansible_inventory,
-            style=Pack(margin=5)
-        )
-
-        # Button to parse ansible playbook
-        parse_playbook_button = toga.Button(
-            'Parse Sample Playbook',
-            on_press=self.parse_ansible_playbook,
-            style=Pack(margin=5)
-        )
-
-        # Button to test Paramiko SSH
-        test_paramiko_button = toga.Button(
-            'Test Paramiko',
-            on_press=self.test_paramiko_connection,
-            style=Pack(margin=5)
-        )
-
-        # Button to run the sample playbook with Paramiko
-        run_playbook_button = toga.Button(
-            'Run Playbook (Paramiko)',
-            on_press=self.run_ansible_playbook,
-            style=Pack(margin=5)
-        )
-
-        # Button to run Ansible ping test
-        ansible_ping_button = toga.Button(
-            'Ansible Ping Test',
-            on_press=self.ansible_ping_test,
-            style=Pack(margin=5)
-        )
-
-        # Button to generate ED25519 key
-        generate_key_button = toga.Button(
-            'Generate ED25519 Key',
-            on_press=self.generate_ed25519_key,
-            style=Pack(margin=5)
-        )
-
-        # Button to run Ansible ping with key
-        ping_with_key_button = toga.Button(
-            'Ping with ED25519 Key',
-            on_press=self.ansible_ping_test_with_key,
-            style=Pack(margin=5)
-        )
+        # Create and add action buttons
+        action_buttons = self.create_action_buttons()
 
         # Output area
         self.output_view = toga.MultilineTextInput(
@@ -113,13 +67,9 @@ class briefcase_ansible_test(toga.App):
 
         # Add components to main box
         main_box.add(title_label)
-        main_box.add(run_button)
-        main_box.add(parse_playbook_button)
-        main_box.add(test_paramiko_button)
-        main_box.add(run_playbook_button)
-        main_box.add(ansible_ping_button)
-        main_box.add(generate_key_button)
-        main_box.add(ping_with_key_button)
+        # Add all action buttons
+        for button in action_buttons:
+            main_box.add(button)
         main_box.add(self.output_view)
         main_box.add(self.status_label)
 
@@ -129,6 +79,61 @@ class briefcase_ansible_test(toga.App):
         self.main_window.size = (600, 400)
         self.main_window.show()
 
+    def create_action_buttons(self):
+        """Create and return all action buttons used in the application."""
+        buttons = []
+        
+        # Button to parse Ansible inventory
+        buttons.append(toga.Button(
+            'Parse Inventory',
+            on_press=self.parse_ansible_inventory,
+            style=Pack(margin=5)
+        ))
+
+        # Button to parse Ansible playbook
+        buttons.append(toga.Button(
+            'Parse Playbook',
+            on_press=self.parse_ansible_playbook,
+            style=Pack(margin=5)
+        ))
+
+        # Button to test Paramiko SSH
+        buttons.append(toga.Button(
+            'Test Paramiko',
+            on_press=self.test_paramiko_connection,
+            style=Pack(margin=5)
+        ))
+
+        # Button to run the sample playbook with Paramiko
+        buttons.append(toga.Button(
+            'Run Playbook (Paramiko)',
+            on_press=self.run_ansible_playbook,
+            style=Pack(margin=5)
+        ))
+
+        # Button to run Ansible ping test
+        buttons.append(toga.Button(
+            'Ansible Ping Test',
+            on_press=self.ansible_ping_test,
+            style=Pack(margin=5)
+        ))
+
+        # Button to generate ED25519 key
+        buttons.append(toga.Button(
+            'Generate ED25519 Key',
+            on_press=self.generate_ed25519_key,
+            style=Pack(margin=5)
+        ))
+
+        # Button to run Ansible ping with key
+        buttons.append(toga.Button(
+            'Ping with ED25519 Key',
+            on_press=self.ansible_ping_test_with_key,
+            style=Pack(margin=5)
+        ))
+        
+        return buttons
+        
     def parse_ansible_inventory(self, widget):
         """Parse Ansible inventory files using InventoryManager directly."""
         # Clear output and update status
