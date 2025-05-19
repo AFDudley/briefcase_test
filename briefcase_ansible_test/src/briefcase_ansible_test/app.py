@@ -32,7 +32,7 @@ from ansible.inventory.manager import InventoryManager
 from ansible.parsing.dataloader import DataLoader
 
 
-class briefcase_ansible_test(toga.App):
+class BriefcaseAnsibleTest(toga.App):
     def __init__(self, *args, **kwargs):
         """Construct the Toga application."""
         super().__init__(*args, **kwargs)
@@ -889,4 +889,4 @@ class briefcase_ansible_test(toga.App):
 def main():
     # Return the app instance without calling main_loop()
     # The caller (e.g., __main__.py) will handle calling main_loop()
-    return briefcase_ansible_test()
+    return BriefcaseAnsibleTest()
