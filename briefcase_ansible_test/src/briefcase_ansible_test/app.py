@@ -370,7 +370,8 @@ class briefcase_ansible_test(toga.App):
             try:
                 import paramiko
                 
-                self.add_text_to_output("Paramiko version: " + paramiko.__version__ + "\n")
+                paramiko_version = getattr(paramiko, "__version__", "unknown")
+                self.add_text_to_output("Paramiko version: " + paramiko_version + "\n")
                 self.add_text_to_output("Initializing SSH client...\n")
                 
                 # Create a client instance
