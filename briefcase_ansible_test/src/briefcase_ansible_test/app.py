@@ -46,6 +46,26 @@ class PwdModuleType(types.ModuleType):
 
 sys.modules['pwd'] = PwdModuleType()
 
+# Create a mock for grp module which might not be available on iOS
+class GrpModule:
+    class Struct:
+        def __init__(self, **entries):
+            self.__dict__.update(entries)
+
+    def getgrgid(self, gid):
+        return self.Struct(gr_name='mobile')
+
+    def getgrnam(self, name):
+        return self.Struct(gr_gid=0, gr_mem=[])
+
+class GrpModuleType(types.ModuleType):
+    def __init__(self):
+        super().__init__('grp')
+        self.getgrgid = GrpModule().getgrgid
+        self.getgrnam = GrpModule().getgrnam
+
+sys.modules['grp'] = GrpModuleType()
+
 # Create a patched version of is_executable for iOS
 def is_executable(path):
     # On iOS we can't execute files anyway, so we'll fake this
@@ -70,23 +90,22 @@ try:
     # Import the real module to use most of its functionality
     import ansible.module_utils.basic as real_basic
 
-    # Create a new module that has all the original attributes
-    mock_basic = type('MockBasicModule', (), {})
-    for attr_name in dir(real_basic):
-        if not attr_name.startswith('__'):
-            setattr(mock_basic, attr_name, getattr(real_basic, attr_name))
-
-    # Override only the problematic function
-    mock_basic.is_executable = is_executable
+    # Create a new module using ModuleType
+    class BasicModuleType(types.ModuleType):
+        def __init__(self):
+            super().__init__('ansible.module_utils.basic')
+            # Copy all attributes from real_basic
+            for attr_name in dir(real_basic):
+                if not attr_name.startswith('__'):
+                    setattr(self, attr_name, getattr(real_basic, attr_name))
+            # Override only the problematic function
+            self.is_executable = is_executable
 
     # Replace the module in sys.modules
-    sys.modules['ansible.module_utils.basic'] = mock_basic
+    sys.modules['ansible.module_utils.basic'] = BasicModuleType()
 except ImportError:
-    # Fall back to a simpler mock if the import fails
-    sys.modules['ansible.module_utils.basic'] = type('MockBasicModule', (), {
-        'is_executable': is_executable,
-        'json_dict_bytes_to_unicode': lambda d: d if isinstance(d, dict) else {}
-    })
+    # If import fails, raise the error since Ansible should always be available
+    raise
 
 # Import Ansible modules directly - skip CLI
 from ansible.inventory.manager import InventoryManager
