@@ -517,42 +517,44 @@ class briefcase_ansible_test(toga.App):
                 # Create a custom callback to receive events
                 results_callback = ResultCallback(self.add_text_to_output)
                 
-                # Create options for playbook execution
+                # Import necessary modules
                 from ansible import constants as C
                 from ansible.executor.playbook_executor import PlaybookExecutor
+                from ansible import context
+                from ansible.utils.context_objects import ImmutableDict
                 
-                options = type('Options', (), {
-                    'connection': 'paramiko',    # Use paramiko for SSH connections
-                    'module_path': None,
-                    'forks': 1,                  # Run tasks serially
-                    'become': None,
-                    'become_method': None,
-                    'become_user': None,
-                    'check': False,              # Don't perform a dry-run
-                    'syntax': False,             # Don't just check syntax
-                    'diff': False,               # Don't show file diffs
-                    'verbosity': 0,              # Minimal output
-                    'listhosts': False,
-                    'listtasks': False,
-                    'listtags': False,
-                    'ssh_common_args': '',
-                    'ssh_extra_args': '',
-                    'sftp_extra_args': '',
-                    'scp_extra_args': '',
-                    'become_ask_pass': False,
-                    'remote_user': None,
-                    'host_key_checking': False   # Disable host key checking
-                })()
+                # Set context.CLIARGS which PlaybookExecutor will use internally
+                context.CLIARGS = ImmutableDict(
+                    connection='paramiko',    # Use paramiko for SSH connections
+                    module_path=None,
+                    forks=1,                  # Run tasks serially
+                    become=None,
+                    become_method=None,
+                    become_user=None,
+                    check=False,              # Don't perform a dry-run
+                    syntax=False,             # Don't just check syntax
+                    diff=False,               # Don't show file diffs
+                    verbosity=0,              # Minimal output
+                    listhosts=False,
+                    listtasks=False,
+                    listtags=False,
+                    ssh_common_args='',
+                    ssh_extra_args='',
+                    sftp_extra_args='',
+                    scp_extra_args='',
+                    become_ask_pass=False,
+                    remote_user=None,
+                    host_key_checking=False   # Disable host key checking
+                )
                 
                 self.add_text_to_output("Setting up playbook executor...\n")
                 
-                # Create playbook executor
+                # Create playbook executor without passing options directly
                 pbex = PlaybookExecutor(
                     playbooks=[playbook_file],
                     inventory=inventory,
                     variable_manager=variable_manager,
                     loader=loader,
-                    options=options,
                     passwords={}
                 )
                 
