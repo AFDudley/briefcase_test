@@ -37,12 +37,11 @@ class briefcase_ansible_test(toga.App):
         """Construct and show the Toga application."""
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
-
-        # Store a reference to the main event loop for background threads
-        self.main_event_loop = asyncio.get_event_loop()
         
     def startup(self):
         """Initialize the application."""
+        # Store a reference to the main event loop for background threads
+        self.main_event_loop = asyncio.get_event_loop()
         # Create and add action buttons
         action_buttons = self.create_action_buttons()
 
