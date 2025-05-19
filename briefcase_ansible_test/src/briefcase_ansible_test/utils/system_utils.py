@@ -117,3 +117,106 @@ def patch_getpass():
     This should be called before any code that might use getpass.getuser.
     """
     getpass.getuser = simple_getuser
+    
+class GrpModule:
+    """
+    A mock implementation of the grp module for platforms where it's not available.
+    
+    This provides the minimum functionality needed by Ansible and other libraries
+    that expect the grp module to be present.
+    """
+    class Struct:
+        """
+        A simple structure class that can be used to create objects with arbitrary attributes.
+        """
+        def __init__(self, **entries):
+            """
+            Initialize the structure with the given key-value pairs as attributes.
+            """
+            self.__dict__.update(entries)
+
+    def getgrgid(self, gid):
+        """
+        Get a group struct by group ID.
+        
+        Args:
+            gid: The group ID (ignored in this implementation).
+            
+        Returns:
+            Struct: A struct with a gr_name attribute set to 'mobile'.
+        """
+        return self.Struct(gr_name='mobile')
+
+    def getgrnam(self, name):
+        """
+        Get a group struct by group name.
+        
+        Args:
+            name: The group name (ignored in this implementation).
+            
+        Returns:
+            Struct: A struct with gr_gid attribute and empty gr_mem list.
+        """
+        return self.Struct(gr_gid=0, gr_mem=[])
+
+def setup_grp_module_mock():
+    """
+    Install a mock grp module in sys.modules if it doesn't already exist.
+    
+    This should be called before importing any modules that might depend on
+    the grp module, particularly on platforms where grp is not available.
+    """
+    if 'grp' not in sys.modules:
+        import types
+        class GrpModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__('grp')
+                self.getgrgid = GrpModule().getgrgid
+                self.getgrnam = GrpModule().getgrnam
+                
+        sys.modules['grp'] = GrpModuleType()
+
+def setup_ansible_text_module_mock():
+    """
+    Install a mock for ansible.module_utils._text in sys.modules.
+    
+    This provides text conversion utilities that Ansible needs.
+    """
+    import types
+    class TextModuleType(types.ModuleType):
+        def __init__(self):
+            super().__init__('ansible.module_utils._text')
+            self.to_native = lambda x, errors='strict': str(x)
+            self.to_bytes = lambda obj, encoding='utf-8', errors='strict': obj.encode(encoding, errors) if isinstance(obj, str) else obj
+            self.to_text = lambda obj, encoding='utf-8', errors='strict': obj.decode(encoding, errors) if isinstance(obj, bytes) else str(obj)
+            
+    sys.modules['ansible.module_utils._text'] = TextModuleType()
+
+def setup_ansible_basic_module_mock():
+    """
+    Patch ansible.module_utils.basic to use our is_executable implementation.
+    
+    This should be called after importing ansible but before using any modules
+    that might depend on the patched functionality.
+    """
+    try:
+        # Import the real module to use most of its functionality
+        import ansible.module_utils.basic as real_basic
+
+        # Create a new module using ModuleType
+        import types
+        class BasicModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__('ansible.module_utils.basic')
+                # Copy all attributes from real_basic
+                for attr_name in dir(real_basic):
+                    if not attr_name.startswith('__'):
+                        setattr(self, attr_name, getattr(real_basic, attr_name))
+                # Override only the problematic function
+                self.is_executable = is_executable
+
+        # Replace the module in sys.modules
+        sys.modules['ansible.module_utils.basic'] = BasicModuleType()
+    except ImportError:
+        # If import fails, raise the error since Ansible should always be available
+        raise
