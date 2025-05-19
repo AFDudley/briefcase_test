@@ -101,7 +101,14 @@ def setup_pwd_module_mock():
     the pwd module, particularly on platforms where pwd is not available.
     """
     if 'pwd' not in sys.modules:
-        sys.modules['pwd'] = PwdModule()
+        import types
+        class PwdModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__('pwd')
+                self.getpwuid = PwdModule().getpwuid
+                self.getpwnam = PwdModule().getpwnam
+                
+        sys.modules['pwd'] = PwdModuleType()
 
 def patch_getpass():
     """
