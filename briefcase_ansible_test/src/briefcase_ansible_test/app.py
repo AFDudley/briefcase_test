@@ -38,7 +38,7 @@ class BriefcaseAnsibleTest(toga.App):
         super().__init__(*args, **kwargs)
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
-        
+
     def startup(self):
         """Initialize the application."""
         # Store a reference to the main event loop for background threads
@@ -65,15 +65,15 @@ class BriefcaseAnsibleTest(toga.App):
             readonly=True,
             style=Pack(flex=1, margin=5)
         )
-        
+
         # Status label for showing current state
         status_label = toga.Label(
             'Ready',
             style=Pack(margin=5)
         )
-        
+
         return output_view, status_label
-    
+
     def create_main_layout(self, action_buttons):
         """Create and return the main layout with all UI components."""
         # Main box with vertical layout
@@ -84,7 +84,7 @@ class BriefcaseAnsibleTest(toga.App):
             'Ansible Inventory Viewer',
             style=Pack(text_align='center', font_size=16, margin=5)
         )
-        
+
         # Add components to main box
         main_box.add(title_label)
         # Add all action buttons
@@ -92,9 +92,9 @@ class BriefcaseAnsibleTest(toga.App):
             main_box.add(button)
         main_box.add(self.output_view)
         main_box.add(self.status_label)
-        
+
         return main_box
-    
+        
     def run_background_task(self, task_func, initial_status="Working..."):
         """
         Execute a function in a background thread with proper error handling.
@@ -127,11 +127,11 @@ class BriefcaseAnsibleTest(toga.App):
         
         # Store the thread to prevent garbage collection
         self.background_tasks.add(thread)
-        
+
     def create_action_buttons(self):
         """Create and return all action buttons used in the application."""
         buttons = []
-        
+
         # Button to parse Ansible inventory
         buttons.append(toga.Button(
             'Parse Inventory',
@@ -186,8 +186,9 @@ class BriefcaseAnsibleTest(toga.App):
     def parse_ansible_inventory(self, widget):
         """Parse Ansible inventory files using InventoryManager directly."""
         
+        # Define the background task function
         def parse_inventory_task():
-            # Path to the inventory directory
+            # Path to inventory directory
             inventory_dir = os.path.join(self.paths.app, 'resources', 'inventory')
 
             # Find all inventory files
@@ -220,7 +221,10 @@ class BriefcaseAnsibleTest(toga.App):
                         for host in group.get_hosts():
                             inventory_data[group_name]['hosts'].append(host.name)
                             # Store host vars
-                            host_vars = inventory.get_host(host.name).get_vars()
+                            host_vars = {}
+                            host_obj = inventory.get_host(host.name)
+                            if host_obj is not None:
+                                host_vars = host_obj.get_vars()
                             inventory_data['_meta']['hostvars'][host.name] = host_vars
 
                 # Format and display the inventory data
@@ -228,7 +232,7 @@ class BriefcaseAnsibleTest(toga.App):
                 self.add_text_to_output(f"Inventory structure:\n{formatted_data}\n\n")
 
             self.update_status("Completed")
-            
+
         # Run the task in a background thread
         self.run_background_task(parse_inventory_task, "Parsing inventory...")
 
@@ -276,45 +280,32 @@ class BriefcaseAnsibleTest(toga.App):
         return update_status_async
 
     def parse_ansible_playbook(self, widget):
-        """Parse the sample Ansible playbook file and display its JSON structure."""
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = "Parsing sample playbook..."
+        """Parse the sample ansible playbook file using Ansible's DataLoader."""
 
-        # Run in a background thread to keep UI responsive
-        def run_in_background():
-            try:
-                # Path to the sample playbook file
-                playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
+        def parse_playbook_task():
+            # Path to the playbook file
+            playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
 
-                self.add_text_to_output("Parsing file: sample_playbook.yml\n")
+            self.add_text_to_output("Parsing file: sample_playbook.yml\n")
 
-                # Use Ansible's data loader to parse the YAML file
-                loader = DataLoader()
+            # Use Ansible's data loader to parse the YAML file
+            loader = DataLoader()
 
-                # Load the playbook file
-                playbook_data = loader.load_from_file(playbook_file)
+            # Load the playbook file
+            playbook_data = loader.load_from_file(playbook_file)
 
-                # Convert playbook data to JSON for display
-                playbook_json = json.dumps(playbook_data, indent=2)
+            # Convert playbook data to JSON for display
+            playbook_json = json.dumps(playbook_data, indent=2)
 
-                # Update the UI with the parsed playbook
-                self.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
+            # Update the UI with the parsed playbook
+            self.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
 
-                # Final update when everything is done
-                self.add_text_to_output("Playbook parsing completed successfully.\n")
-                self.update_status("Completed")
+            # Final update when everything is done
+            self.add_text_to_output("Playbook parsing completed successfully.\n")
+            self.update_status("Completed")
 
-            except Exception as error:
-                # Handle any exceptions
-                error_message = str(error)
-                self.add_text_to_output(f"Error parsing playbook: {error_message}")
-                self.update_status("Error")
-
-        # Start background thread
-        thread = threading.Thread(target=run_in_background)
-        thread.daemon = True
-        thread.start()
+        # Run the task in a background thread
+        self.run_background_task(parse_playbook_task, "Parsing playbook...")
 
     def test_paramiko_connection(self, widget):
         """Test a basic Paramiko SSH connection."""
