@@ -53,17 +53,8 @@ class briefcase_ansible_test(toga.App):
         # Create and add action buttons
         action_buttons = self.create_action_buttons()
 
-        # Output area
-        self.output_view = toga.MultilineTextInput(
-            readonly=True,
-            style=Pack(flex=1, margin=5)
-        )
-
-        # Status label
-        self.status_label = toga.Label(
-            'Ready',
-            style=Pack(margin=5)
-        )
+        # Create output area and status label
+        self.output_view, self.status_label = self.create_output_area()
 
         # Add components to main box
         main_box.add(title_label)
@@ -79,6 +70,22 @@ class briefcase_ansible_test(toga.App):
         self.main_window.size = (600, 400)
         self.main_window.show()
 
+    def create_output_area(self):
+        """Create and return the output text area and status label."""
+        # Output text area for displaying results
+        output_view = toga.MultilineTextInput(
+            readonly=True,
+            style=Pack(flex=1, margin=5)
+        )
+        
+        # Status label for showing current state
+        status_label = toga.Label(
+            'Ready',
+            style=Pack(margin=5)
+        )
+        
+        return output_view, status_label
+        
     def create_action_buttons(self):
         """Create and return all action buttons used in the application."""
         buttons = []
