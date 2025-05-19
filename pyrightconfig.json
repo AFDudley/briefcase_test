@@ -1,0 +1,5 @@
+{
+  "include": ["briefcase_test/briefcase_ansible_test/src/briefcase_ansible_test/app.py", "briefcase_test/briefcase_ansible_test/src/briefcase_ansible_test/utils/**/*.py"],
+  "exclude": ["**/app_packages/**", "**/site-packages/**", "**/build/**"],
+  "typeCheckingMode": "basic"
+}
