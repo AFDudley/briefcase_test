@@ -309,95 +309,78 @@ class BriefcaseAnsibleTest(toga.App):
 
     def test_paramiko_connection(self, widget):
         """Test a basic Paramiko SSH connection."""
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = "Testing Paramiko connection..."
+        
+        def paramiko_test_task():
+            import paramiko
 
-        # Run in a background thread to keep UI responsive
-        def run_in_background():
+            paramiko_version = getattr(paramiko, "__version__", "unknown")
+            self.add_text_to_output("Paramiko version: " + paramiko_version + "\n")
+            self.add_text_to_output("Initializing SSH client...\n")
+
+            # Create a client instance
+            client = paramiko.SSHClient()
+
+            # Auto-accept host keys
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+            # Connection parameters - using localhost for testing
+            hostname = '127.0.0.1'
+            username = 'mobile'  # Use a default username
+            port = 22
+
+            # For testing, we'll just attempt the connection but not authenticate
+            # This will test if Paramiko can create a socket connection
+            self.add_text_to_output(f"Connecting to {hostname}:{port} as {username}...\n")
+
             try:
-                import paramiko
+                # Try to connect with a short timeout
+                # We expect this to fail due to authentication, but it will show
+                # that the basic socket connection works
+                client.connect(
+                    hostname=hostname,
+                    username=username,
+                    port=port,
+                    timeout=2,
+                    allow_agent=False,
+                    look_for_keys=False
+                )
 
-                paramiko_version = getattr(paramiko, "__version__", "unknown")
-                self.add_text_to_output("Paramiko version: " + paramiko_version + "\n")
-                self.add_text_to_output("Initializing SSH client...\n")
+                self.add_text_to_output("Connection successful! This is unexpected.\n")
+                client.close()
 
-                # Create a client instance
-                client = paramiko.SSHClient()
+            except paramiko.AuthenticationException:
+                # This is actually good - means the socket connection worked
+                # but authentication failed as expected
+                self.add_text_to_output("Authentication failed as expected. Socket connection works!\n")
+                self.add_text_to_output("✅ Paramiko is working correctly.\n")
 
-                # Auto-accept host keys
-                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-                # Connection parameters - using localhost for testing
-                hostname = '127.0.0.1'
-                username = 'mobile'  # Use a default username
-                port = 22
-
-                # For testing, we'll just attempt the connection but not authenticate
-                # This will test if Paramiko can create a socket connection
-                self.add_text_to_output(f"Connecting to {hostname}:{port} as {username}...\n")
-
-                try:
-                    # Try to connect with a short timeout
-                    # We expect this to fail due to authentication, but it will show
-                    # that the basic socket connection works
-                    client.connect(
-                        hostname=hostname,
-                        username=username,
-                        port=port,
-                        timeout=2,
-                        allow_agent=False,
-                        look_for_keys=False
-                    )
-
-                    self.add_text_to_output("Connection successful! This is unexpected.\n")
-                    client.close()
-
-                except paramiko.AuthenticationException:
-                    # This is actually good - means the socket connection worked
-                    # but authentication failed as expected
-                    self.add_text_to_output("Authentication failed as expected. Socket connection works!\n")
-                    self.add_text_to_output("✅ Paramiko is working correctly.\n")
-
-                except paramiko.SSHException as e:
-                    # This might still be okay depending on the error
-                    self.add_text_to_output(f"SSH error: {str(e)}\n")
-                    if "banner exchange" in str(e).lower():
-                        self.add_text_to_output("✅ Banner exchange attempted! Paramiko is working.\n")
-                    else:
-                        self.add_text_to_output("⚠️ SSH negotiation failed, but socket connection may still be working.\n")
-
-                except Exception as e:
-                    # Other connection errors
-                    self.add_text_to_output(f"Connection error: {str(e)}\n")
-                    self.add_text_to_output("❌ Socket connection failed.\n")
-
-                # Additional tests to check if Paramiko can generate keys
-                self.add_text_to_output("\nTesting key generation capability...\n")
-
-                try:
-                    # Generate a small test key
-                    key = paramiko.RSAKey.generate(bits=1024)
-                    self.add_text_to_output(f"✅ Generated RSA key: {key.get_fingerprint().hex()}\n")
-                except Exception as e:
-                    self.add_text_to_output(f"❌ Key generation failed: {str(e)}\n")
-
-                self.update_status("Completed")
-
-            except ImportError as e:
-                self.add_text_to_output(f"Error importing Paramiko: {str(e)}\n")
-                self.add_text_to_output("❌ Paramiko is not available in this environment.\n")
-                self.update_status("Failed")
+            except paramiko.SSHException as e:
+                # This might still be okay depending on the error
+                self.add_text_to_output(f"SSH error: {str(e)}\n")
+                if "banner exchange" in str(e).lower():
+                    self.add_text_to_output("✅ Banner exchange attempted! Paramiko is working.\n")
+                else:
+                    self.add_text_to_output("⚠️ SSH negotiation failed, but socket connection may still be working.\n")
 
             except Exception as e:
-                # Handle any other exceptions
-                self.add_text_to_output(f"Unexpected error: {str(e)}\n")
-                self.update_status("Error")
+                # Other connection errors
+                self.add_text_to_output(f"Connection error: {str(e)}\n")
+                self.add_text_to_output("❌ Socket connection failed.\n")
 
-        # Start background thread
-        thread = threading.Thread(target=run_in_background)
-        thread.daemon = True
-        thread.start()
+            # Additional tests to check if Paramiko can generate keys
+            self.add_text_to_output("\nTesting key generation capability...\n")
+
+            try:
+                # Generate a small test key
+                key = paramiko.RSAKey.generate(bits=1024)
+                self.add_text_to_output(f"✅ Generated RSA key: {key.get_fingerprint().hex()}\n")
+            except Exception as e:
+                self.add_text_to_output(f"❌ Key generation failed: {str(e)}\n")
+
+            self.update_status("Completed")
+        
+        # Run the task in a background thread
+        self.run_background_task(paramiko_test_task, "Testing Paramiko connection...")
 
     def run_ansible_playbook(self, widget):
         """Run the sample Ansible playbook using Paramiko for SSH connections."""
