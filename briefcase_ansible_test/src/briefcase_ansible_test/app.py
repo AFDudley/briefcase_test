@@ -901,8 +901,8 @@ class briefcase_ansible_test(toga.App):
                     private_key_file=private_key_path
                 )
                 
-                # Set the SSH key in ansible.cfg programmatically
-                C.DEFAULT_PRIVATE_KEY_FILE = private_key_path
+                # Set the SSH key in options rather than trying to modify constants
+                # private_key_file parameter in CLIARGS will be used by Ansible
                 
                 # Create play with ping task
                 play_source = dict(
