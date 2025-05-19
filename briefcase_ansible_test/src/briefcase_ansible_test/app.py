@@ -33,8 +33,9 @@ from ansible.parsing.dataloader import DataLoader
 
 
 class briefcase_ansible_test(toga.App):
-    def startup(self):
-        """Construct and show the Toga application."""
+    def __init__(self, *args, **kwargs):
+        """Construct the Toga application."""
+        super().__init__(*args, **kwargs)
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
         
