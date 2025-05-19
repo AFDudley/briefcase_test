@@ -94,6 +94,39 @@ class BriefcaseAnsibleTest(toga.App):
         main_box.add(self.status_label)
         
         return main_box
+    
+    def run_background_task(self, task_func, initial_status="Working..."):
+        """
+        Execute a function in a background thread with proper error handling.
+        
+        Args:
+            task_func: The function to execute in the background
+            initial_status: The status message to display while task is running
+        """
+        # Clear output and update status
+        self.output_view.value = ""
+        self.status_label.text = initial_status
+        
+        # Create a wrapper function to handle exceptions
+        def background_wrapper():
+            try:
+                # Execute the actual task
+                task_func()
+            except Exception as error:
+                # Handle any exceptions
+                error_message = str(error)
+                self.add_text_to_output(f"Error: {error_message}")
+                self.update_status("Error")
+                # Add traceback for debugging
+                self.add_text_to_output(f"\nTraceback:\n{traceback.format_exc()}")
+        
+        # Start background thread
+        thread = threading.Thread(target=background_wrapper)
+        thread.daemon = True
+        thread.start()
+        
+        # Store the thread to prevent garbage collection
+        self.background_tasks.add(thread)
         
     def create_action_buttons(self):
         """Create and return all action buttons used in the application."""
@@ -152,69 +185,52 @@ class BriefcaseAnsibleTest(toga.App):
         
     def parse_ansible_inventory(self, widget):
         """Parse Ansible inventory files using InventoryManager directly."""
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = "Parsing inventory..."
+        
+        def parse_inventory_task():
+            # Path to the inventory directory
+            inventory_dir = os.path.join(self.paths.app, 'resources', 'inventory')
 
-        # Run in a background thread to keep UI responsive
-        def run_in_background():
-            try:
-                # Path to the inventory directory
-                inventory_dir = os.path.join(self.paths.app, 'resources', 'inventory')
+            # Find all inventory files
+            inventory_files = []
+            for filename in os.listdir(inventory_dir):
+                if filename.endswith('.ini') or filename.endswith('.yml'):
+                    inventory_files.append(os.path.join(inventory_dir, filename))
 
-                # Find all inventory files
-                inventory_files = []
-                for filename in os.listdir(inventory_dir):
-                    if filename.endswith('.ini') or filename.endswith('.yml'):
-                        inventory_files.append(os.path.join(inventory_dir, filename))
+            # Update UI from the main thread
+            self.add_text_to_output(f"Found {len(inventory_files)} inventory files\n")
 
-                # Update UI from the main thread
-                self.add_text_to_output(f"Found {len(inventory_files)} inventory files\n")
+            # Process each inventory file
+            for inv_file in inventory_files:
+                self.add_text_to_output(f"Parsing file: {os.path.basename(inv_file)}\n")
 
-                # Process each inventory file
-                for inv_file in inventory_files:
-                    self.add_text_to_output(f"Parsing file: {os.path.basename(inv_file)}\n")
+                # Use Ansible's inventory manager to parse the file
+                loader = DataLoader()
+                inventory = InventoryManager(loader=loader, sources=[inv_file])
 
-                    # Use Ansible's inventory manager to parse the file
-                    loader = DataLoader()
-                    inventory = InventoryManager(loader=loader, sources=[inv_file])
+                # Create a dictionary to hold inventory data
+                inventory_data = {'_meta': {'hostvars': {}}, 'all': {'children': []}}
 
-                    # Create a dictionary to hold inventory data
-                    inventory_data = {'_meta': {'hostvars': {}}, 'all': {'children': []}}
+                # Build inventory structure
+                for group_name in inventory.groups:
+                    group = inventory.groups[group_name]
+                    if group_name != 'all' and group_name != 'ungrouped':
+                        inventory_data['all']['children'].append(group_name)
+                        inventory_data[group_name] = {'hosts': []}
+                        # Add hosts to the group
+                        for host in group.get_hosts():
+                            inventory_data[group_name]['hosts'].append(host.name)
+                            # Store host vars
+                            host_vars = inventory.get_host(host.name).get_vars()
+                            inventory_data['_meta']['hostvars'][host.name] = host_vars
 
-                    # Build inventory structure
-                    for group_name in inventory.groups:
-                        group = inventory.groups[group_name]
-                        # Skip 'all' and 'ungrouped' special groups
-                        if group.name not in ['all', 'ungrouped']:
-                            inventory_data[group.name] = {'hosts': []}
-                            for host in group.hosts:
-                                inventory_data[group.name]['hosts'].append(host.name)
-                                # Add host vars
-                                inventory_data['_meta']['hostvars'][host.name] = host.vars
-                            # Add this group as a child of 'all'
-                            inventory_data['all']['children'].append(group.name)
+                # Format and display the inventory data
+                formatted_data = json.dumps(inventory_data, indent=2)
+                self.add_text_to_output(f"Inventory structure:\n{formatted_data}\n\n")
 
-                    # Convert inventory data to JSON
-                    inventory_json = json.dumps(inventory_data, indent=2)
-
-                    # Update the UI
-                    self.add_text_to_output(f"Parsed data:\n{inventory_json}\n\n")
-
-                # Final update when everything is done
-                self.add_text_to_output("Inventory parsing completed successfully.\n")
-                self.update_status("Completed")
-
-            except Exception as error:
-                # Handle any exceptions
-                error_message = str(error)
-                self.add_text_to_output(f"Error parsing inventory: {error_message}")
-                self.update_status("Error")
-
-        # Start background thread
-        thread = threading.Thread(target=run_in_background)
-        thread.daemon = True
-        thread.start()
+            self.update_status("Completed")
+            
+        # Run the task in a background thread
+        self.run_background_task(parse_inventory_task, "Parsing inventory...")
 
     def add_text_to_output(self, text):
         """Add text to the output view from any thread."""
