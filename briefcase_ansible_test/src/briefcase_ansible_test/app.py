@@ -40,29 +40,17 @@ class briefcase_ansible_test(toga.App):
 
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
-
-        # Create main box with vertical layout
-        main_box = toga.Box(style=Pack(direction="column", margin=10))
-
-        # Title
-        title_label = toga.Label(
-            'Ansible Inventory Viewer',
-            style=Pack(text_align='center', font_size=16, margin=5)
-        )
-
+        
+    def startup(self):
+        """Initialize the application."""
         # Create and add action buttons
         action_buttons = self.create_action_buttons()
 
         # Create output area and status label
         self.output_view, self.status_label = self.create_output_area()
 
-        # Add components to main box
-        main_box.add(title_label)
-        # Add all action buttons
-        for button in action_buttons:
-            main_box.add(button)
-        main_box.add(self.output_view)
-        main_box.add(self.status_label)
+        # Create main layout with all components
+        main_box = self.create_main_layout(action_buttons)
 
         # Create and show the main window
         self.main_window = toga.MainWindow(title=self.formal_name)
@@ -85,6 +73,27 @@ class briefcase_ansible_test(toga.App):
         )
         
         return output_view, status_label
+    
+    def create_main_layout(self, action_buttons):
+        """Create and return the main layout with all UI components."""
+        # Main box with vertical layout
+        main_box = toga.Box(style=Pack(direction="column", margin=10))
+
+        # App title
+        title_label = toga.Label(
+            'Ansible Inventory Viewer',
+            style=Pack(text_align='center', font_size=16, margin=5)
+        )
+        
+        # Add components to main box
+        main_box.add(title_label)
+        # Add all action buttons
+        for button in action_buttons:
+            main_box.add(button)
+        main_box.add(self.output_view)
+        main_box.add(self.status_label)
+        
+        return main_box
         
     def create_action_buttons(self):
         """Create and return all action buttons used in the application."""
