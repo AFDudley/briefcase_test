@@ -4,6 +4,7 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 
 import os
 import sys
+import types
 import toga
 from toga.style import Pack
 import threading
@@ -37,7 +38,13 @@ class PwdModule:
         return self.Struct(pw_uid=0, pw_gid=0, pw_dir='/home/mobile')
 
 # Install the fake pwd module before Ansible imports
-sys.modules['pwd'] = PwdModule()
+class PwdModuleType(types.ModuleType):
+    def __init__(self):
+        super().__init__('pwd')
+        self.getpwuid = PwdModule().getpwuid
+        self.getpwnam = PwdModule().getpwnam
+
+sys.modules['pwd'] = PwdModuleType()
 
 # Create a patched version of is_executable for iOS
 def is_executable(path):
@@ -49,11 +56,14 @@ def is_executable(path):
     return (file_mode & stat.S_IXUSR) or path.endswith(('.sh', '.py', '.bin', '.exe'))
 
 # Monkey patch text module before importing Ansible
-sys.modules['ansible.module_utils._text'] = type('MockTextModule', (), {
-    'to_native': lambda x, errors='strict': str(x),
-    'to_bytes': lambda obj, encoding='utf-8', errors='strict': obj.encode(encoding, errors) if isinstance(obj, str) else obj,
-    'to_text': lambda obj, encoding='utf-8', errors='strict': obj.decode(encoding, errors) if isinstance(obj, bytes) else str(obj)
-})
+class TextModuleType(types.ModuleType):
+    def __init__(self):
+        super().__init__('ansible.module_utils._text')
+        self.to_native = lambda x, errors='strict': str(x)
+        self.to_bytes = lambda obj, encoding='utf-8', errors='strict': obj.encode(encoding, errors) if isinstance(obj, str) else obj
+        self.to_text = lambda obj, encoding='utf-8', errors='strict': obj.decode(encoding, errors) if isinstance(obj, bytes) else str(obj)
+
+sys.modules['ansible.module_utils._text'] = TextModuleType()
 
 # Import the real module and override only what's needed
 try:
