@@ -558,8 +558,9 @@ class briefcase_ansible_test(toga.App):
                     passwords={}
                 )
                 
-                # Register our callback
-                pbex._tqm._stdout_callback = results_callback
+                # Register our callback if _tqm is available
+                if pbex._tqm is not None:
+                    pbex._tqm._stdout_callback = results_callback
                 
                 self.add_text_to_output("Starting playbook execution with Paramiko transport...\n\n")
                 
