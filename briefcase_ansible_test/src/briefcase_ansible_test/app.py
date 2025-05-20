@@ -606,20 +606,7 @@ class BriefcaseAnsibleTest(toga.App):
         thread.start()
 
 
-    def create_ssh_directory(self):
-        """Create a directory for SSH keys if it doesn't exist."""
-        # Call the implementation from connection_utils
-        return create_ssh_directory(self)
 
-    def generate_ed25519_key(self, widget):
-        """Generate a new ED25519 SSH key and save it to the app resources."""
-        # Call the implementation from connection_utils
-        generate_ed25519_key(self, widget)
-
-    def ansible_ping_test_with_key(self, widget):
-        """Run an Ansible ping module against night2 using the ED25519 key."""
-        # Call the implementation from connection_utils
-        ansible_ping_test_with_key(self, widget)
 
 
 def main():
