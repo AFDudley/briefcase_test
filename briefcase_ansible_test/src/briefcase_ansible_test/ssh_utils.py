@@ -70,13 +70,13 @@ def import_paramiko():
 
 def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=None):
     """
-    Test an SSH connection using Paramiko.
+    Test an SSH connection using Paramiko with an ED25519 key.
     
     Args:
         hostname: The hostname to connect to
         username: The username to authenticate as
         port: The port to connect to (default: 22)
-        key_path: Path to private key file (optional)
+        key_path: Path to private key file (default: will look in resources/keys)
         ui_updater: UI updater for showing progress (optional)
     
     Returns:
@@ -99,18 +99,33 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
+        # If key_path not provided, try to find the default key
+        if not key_path and ui_updater and hasattr(ui_updater, 'app') and hasattr(ui_updater.app, 'paths'):
+            key_path = os.path.join(ui_updater.app.paths.app, 'resources', 'keys', 'briefcase_test_key')
+            
         # Check if key exists
         key = None
         if key_path and os.path.exists(key_path):
             if ui_updater:
                 ui_updater.add_text_to_output(f"Using key: {key_path}\n")
+            
+            # Set proper permissions
             try:
-                key = paramiko.RSAKey.from_private_key_file(key_path)
-                if ui_updater:
-                    ui_updater.add_text_to_output("Successfully loaded key\n")
+                os.chmod(key_path, 0o600)
             except Exception as e:
                 if ui_updater:
-                    ui_updater.add_text_to_output(f"Error loading key: {str(e)}\n")
+                    ui_updater.add_text_to_output(f"Warning: Could not set key permissions: {str(e)}\n")
+            
+            # Try to load as ED25519 key
+            try:
+                key = paramiko.Ed25519Key.from_private_key_file(key_path)
+                if ui_updater:
+                    ui_updater.add_text_to_output("✅ Successfully loaded ED25519 key\n")
+            except Exception as e:
+                if ui_updater:
+                    ui_updater.add_text_to_output(f"❌ Error loading ED25519 key: {str(e)}\n")
+        elif ui_updater:
+            ui_updater.add_text_to_output(f"❌ No key found at: {key_path}\n")
         
         # Attempt connection
         if ui_updater:
@@ -128,7 +143,7 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
         )
         
         if ui_updater:
-            ui_updater.add_text_to_output("Connection successful!\n")
+            ui_updater.add_text_to_output("✅ Connection successful!\n")
         
         # Test a simple command if connected
         stdin, stdout, stderr = client.exec_command("echo Hello from Paramiko")
