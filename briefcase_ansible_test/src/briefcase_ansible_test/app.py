@@ -177,19 +177,7 @@ class BriefcaseAnsibleTest(toga.App):
             style=Pack(margin=5)
         ))
 
-        # Button to generate ED25519 key
-        buttons.append(toga.Button(
-            'Generate ED25519 Key',
-            on_press=self.generate_ed25519_key,
-            style=Pack(margin=5)
-        ))
-
-        # Button to run Ansible ping with key
-        buttons.append(toga.Button(
-            'Ping with ED25519 Key',
-            on_press=self.ansible_ping_test_with_key,
-            style=Pack(margin=5)
-        ))
+        # SSH key buttons removed
         
         return buttons
         
