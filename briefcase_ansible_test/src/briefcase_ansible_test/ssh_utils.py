@@ -19,7 +19,18 @@ def patch_paramiko_for_async():
     """
     try:
         # Create dummy sftp_file module to prevent the real one from loading
-        sys.modules['paramiko.sftp_file'] = types.ModuleType('paramiko.sftp_file')
+        sftp_file_module = types.ModuleType('paramiko.sftp_file')
+        
+        # Add a dummy SFTPFile class with methods that don't use 'async' keyword
+        class SFTPFile:
+            def _close(self, async_=True):
+                pass
+            def close(self):
+                pass
+        
+        # Add the class to the module
+        sftp_file_module.SFTPFile = SFTPFile
+        sys.modules['paramiko.sftp_file'] = sftp_file_module
         
         # Fix for MutableMapping in Python 3.10+
         if sys.version_info >= (3, 10):
