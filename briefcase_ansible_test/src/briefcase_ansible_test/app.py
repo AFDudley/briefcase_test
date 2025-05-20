@@ -104,11 +104,11 @@ class BriefcaseAnsibleTest(toga.App):
         main_box.add(self.status_label)
 
         return main_box
-        
+
     def run_background_task(self, task_func, initial_status="Working..."):
         """
         Execute a function in a background thread with proper error handling.
-        
+
         Args:
             task_func: The function to execute in the background
             initial_status: The status message to display while task is running
@@ -116,7 +116,7 @@ class BriefcaseAnsibleTest(toga.App):
         # Clear output and update status
         self.output_view.value = ""
         self.status_label.text = initial_status
-        
+
         # Create a wrapper function to handle exceptions
         def background_wrapper():
             try:
@@ -129,12 +129,12 @@ class BriefcaseAnsibleTest(toga.App):
                 self.update_status("Error")
                 # Add traceback for debugging
                 self.add_text_to_output(f"\nTraceback:\n{traceback.format_exc()}")
-        
+
         # Start background thread
         thread = threading.Thread(target=background_wrapper)
         thread.daemon = True
         thread.start()
-        
+
         # Store the thread to prevent garbage collection
         self.background_tasks.add(thread)
 
@@ -178,12 +178,12 @@ class BriefcaseAnsibleTest(toga.App):
         ))
 
         # SSH key buttons removed
-        
+
         return buttons
-        
+
     def parse_ansible_inventory(self, widget):
         """Parse Ansible inventory files using InventoryManager directly."""
-        
+
         # Define the background task function
         def parse_inventory_task():
             # Path to inventory directory
@@ -310,26 +310,26 @@ class BriefcaseAnsibleTest(toga.App):
         # Clear output and update status
         self.output_view.value = ""
         self.status_label.text = "Testing Paramiko connection..."
-        
+
         # Define a UI updater object that test_ssh_connection can use
         class UIUpdater:
             def __init__(self, app):
                 self.app = app
-                
+
             def add_text_to_output(self, text):
                 self.app.add_text_to_output(text)
-                
+
             def update_status(self, text):
                 self.app.update_status(text)
-        
+
         # Run in background to keep UI responsive
         def run_in_background():
             # Create a UI updater object
             ui_updater = UIUpdater(self)
-            
+
             # Run the SSH test
-            test_ssh_connection('127.0.0.1', 'mobile', ui_updater=ui_updater)
-        
+            test_ssh_connection('night2', 'mtm', ui_updater=ui_updater)
+
         # Run the task in a background thread
         self.run_background_task(run_in_background, "Testing Paramiko connection...")
 
