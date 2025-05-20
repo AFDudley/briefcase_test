@@ -99,13 +99,16 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        # If key_path not provided, try to find the default key
-        if not key_path and ui_updater and hasattr(ui_updater, 'app') and hasattr(ui_updater.app, 'paths'):
-            key_path = os.path.join(ui_updater.app.paths.app, 'resources', 'keys', 'briefcase_test_key')
-            
+        # key_path must be provided by caller
+        
         # Check if key exists
         key = None
-        if key_path and os.path.exists(key_path):
+        if not key_path:
+            if ui_updater:
+                ui_updater.add_text_to_output("❌ No key path provided\n")
+            return False
+            
+        if os.path.exists(key_path):
             if ui_updater:
                 ui_updater.add_text_to_output(f"Using key: {key_path}\n")
             

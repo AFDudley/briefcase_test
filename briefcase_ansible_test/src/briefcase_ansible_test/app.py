@@ -51,9 +51,6 @@ class BriefcaseAnsibleTest(toga.App):
         super().__init__(*args, **kwargs)
         # Store a set for background tasks to prevent garbage collection
         self.background_tasks = set()
-        # Create UI helper instances
-        self.ui_updater = UIUpdater(self)
-        self.background_task_runner = BackgroundTaskRunner(self)
 
     def startup(self):
         """Initialize the application."""
@@ -63,10 +60,18 @@ class BriefcaseAnsibleTest(toga.App):
         action_buttons = self.create_action_buttons()
 
         # Create output area and status label
-        self.output_view, self.status_label = UIComponents.create_output_area(self)
+        self.output_view, self.status_label = UIComponents.create_output_area()
+
+        # Create UI updater and background task runner
+        self.ui_updater = UIUpdater(self.output_view, self.status_label, self.main_event_loop)
+        self.background_task_runner = BackgroundTaskRunner(self.ui_updater)
+        
+        # Make sure background_task_runner uses our task set
+        self.background_task_runner.background_tasks = self.background_tasks
 
         # Create main layout with all components
-        main_box = UIComponents.create_main_layout(self, action_buttons, self.output_view, self.status_label)
+        main_box = UIComponents.create_main_layout('Ansible Inventory Viewer', action_buttons, 
+                                                 self.output_view, self.status_label)
 
         # Create and show the main window
         self.main_window = toga.MainWindow(title=self.formal_name)
@@ -238,7 +243,7 @@ class BriefcaseAnsibleTest(toga.App):
             self.update_status("Completed")
 
         # Run the task in a background thread
-        self.run_background_task(parse_inventory_task, "Parsing inventory...")
+        self.background_task_runner.run_task(parse_inventory_task, "Parsing inventory...")
 
     def add_text_to_output(self, text):
         """Add text to the output view from any thread."""
@@ -309,24 +314,22 @@ class BriefcaseAnsibleTest(toga.App):
             self.update_status("Completed")
 
         # Run the task in a background thread
-        self.run_background_task(parse_playbook_task, "Parsing playbook...")
+        self.background_task_runner.run_task(parse_playbook_task, "Parsing playbook...")
 
     def test_paramiko_connection(self, widget):
         """Test a basic Paramiko SSH connection."""
         # Run in background to keep UI responsive
         def run_in_background():
-            # Run the SSH test with our UI updater
-            test_ssh_connection('night2', 'mtm', ui_updater=self.ui_updater)
+            # Get path to the SSH key
+            key_path = os.path.join(self.paths.app, 'resources', 'keys', 'briefcase_test_key')
+            # Run the SSH test with our UI updater and the key path
+            test_ssh_connection('night2', 'mtm', key_path=key_path, ui_updater=self.ui_updater)
 
         # Run the task in a background thread
-        self.run_background_task(run_in_background, "Testing Paramiko connection...")
+        self.background_task_runner.run_task(run_in_background, "Testing Paramiko connection...")
 
     def run_ansible_playbook(self, widget):
         """Run the sample Ansible playbook using Paramiko for SSH connections."""
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = "Running sample playbook..."
-
         # Run in a background thread to keep UI responsive
         def run_in_background():
             try:
@@ -449,18 +452,12 @@ class BriefcaseAnsibleTest(toga.App):
                 self.add_text_to_output(f"Error executing playbook: {error_message}")
                 self.update_status("Error")
 
-        # Start background thread
-        thread = threading.Thread(target=run_in_background)
-        thread.daemon = True
-        thread.start()
+        # Run the task in a background thread
+        self.background_task_runner.run_task(run_in_background, "Running sample playbook...")
 
 
     def ansible_ping_test(self, widget):
         """Run an Ansible ping module against night2 to verify SSH connectivity."""
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = "Running Ansible ping test..."
-
         # Run in a background thread to keep UI responsive
         def run_in_background():
             try:
@@ -576,10 +573,8 @@ class BriefcaseAnsibleTest(toga.App):
                 self.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
                 self.update_status("Error")
 
-        # Start background thread
-        thread = threading.Thread(target=run_in_background)
-        thread.daemon = True
-        thread.start()
+        # Run the task in a background thread
+        self.background_task_runner.run_task(run_in_background, "Running Ansible ping test...")
 
 
 
