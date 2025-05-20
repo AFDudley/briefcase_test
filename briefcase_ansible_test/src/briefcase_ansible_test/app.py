@@ -19,13 +19,15 @@ from briefcase_ansible_test.utils.system_utils import (
     setup_ansible_basic_module_mock
 )
 
-# Import connection utilities
-from briefcase_ansible_test.utils.connection_utils import (
-    test_paramiko_connection,
-    create_ssh_directory,
-    generate_ed25519_key,
-    ansible_ping_test_with_key
+# Import SSH utilities
+from briefcase_ansible_test.ssh_utils import (
+    patch_paramiko_for_async,
+    import_paramiko,
+    test_ssh_connection
 )
+
+# Apply patch for Paramiko's async keyword issue
+patch_paramiko_for_async()
 
 # Setup all the module mocks needed for cross-platform compatibility
 patch_getpass()
@@ -317,8 +319,31 @@ class BriefcaseAnsibleTest(toga.App):
 
     def test_paramiko_connection(self, widget):
         """Test a basic Paramiko SSH connection."""
-        # Call the implementation from connection_utils
-        test_paramiko_connection(self, widget)
+        # Clear output and update status
+        self.output_view.value = ""
+        self.status_label.text = "Testing Paramiko connection..."
+        
+        # Define a UI updater object that test_ssh_connection can use
+        class UIUpdater:
+            def __init__(self, app):
+                self.app = app
+                
+            def add_text_to_output(self, text):
+                self.app.add_text_to_output(text)
+                
+            def update_status(self, text):
+                self.app.update_status(text)
+        
+        # Run in background to keep UI responsive
+        def run_in_background():
+            # Create a UI updater object
+            ui_updater = UIUpdater(self)
+            
+            # Run the SSH test
+            test_ssh_connection('127.0.0.1', 'mobile', ui_updater=ui_updater)
+        
+        # Run the task in a background thread
+        self.run_background_task(run_in_background, "Testing Paramiko connection...")
 
     def run_ansible_playbook(self, widget):
         """Run the sample Ansible playbook using Paramiko for SSH connections."""
