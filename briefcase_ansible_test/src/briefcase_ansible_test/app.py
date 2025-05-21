@@ -79,75 +79,9 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_window.size = (600, 400)
         self.main_window.show()
 
-    def create_output_area(self):
-        """Create and return the output text area and status label."""
-        # Output text area for displaying results
-        output_view = toga.MultilineTextInput(
-            readonly=True,
-            style=Pack(flex=1, margin=5)
-        )
+    # Using the UIComponents class from ui.py instead of local methods
 
-        # Status label for showing current state
-        status_label = toga.Label(
-            'Ready',
-            style=Pack(margin=5)
-        )
-
-        return output_view, status_label
-
-    def create_main_layout(self, action_buttons):
-        """Create and return the main layout with all UI components."""
-        # Main box with vertical layout
-        main_box = toga.Box(style=Pack(direction="column", margin=10))
-
-        # App title
-        title_label = toga.Label(
-            'Ansible Inventory Viewer',
-            style=Pack(text_align='center', font_size=16, margin=5)
-        )
-
-        # Add components to main box
-        main_box.add(title_label)
-        # Add all action buttons
-        for button in action_buttons:
-            main_box.add(button)
-        main_box.add(self.output_view)
-        main_box.add(self.status_label)
-
-        return main_box
-
-    def run_background_task(self, task_func, initial_status="Working..."):
-        """
-        Execute a function in a background thread with proper error handling.
-
-        Args:
-            task_func: The function to execute in the background
-            initial_status: The status message to display while task is running
-        """
-        # Clear output and update status
-        self.output_view.value = ""
-        self.status_label.text = initial_status
-
-        # Create a wrapper function to handle exceptions
-        def background_wrapper():
-            try:
-                # Execute the actual task
-                task_func()
-            except Exception as error:
-                # Handle any exceptions
-                error_message = str(error)
-                self.add_text_to_output(f"Error: {error_message}")
-                self.update_status("Error")
-                # Add traceback for debugging
-                self.add_text_to_output(f"\nTraceback:\n{traceback.format_exc()}")
-
-        # Start background thread
-        thread = threading.Thread(target=background_wrapper)
-        thread.daemon = True
-        thread.start()
-
-        # Store the thread to prevent garbage collection
-        self.background_tasks.add(thread)
+    # Using BackgroundTaskRunner from ui.py instead of local run_background_task method
 
     def create_action_buttons(self):
         """Create and return all action buttons used in the application."""
@@ -207,11 +141,11 @@ class BriefcaseAnsibleTest(toga.App):
                     inventory_files.append(os.path.join(inventory_dir, filename))
 
             # Update UI from the main thread
-            self.add_text_to_output(f"Found {len(inventory_files)} inventory files\n")
+            self.ui_updater.add_text_to_output(f"Found {len(inventory_files)} inventory files\n")
 
             # Process each inventory file
             for inv_file in inventory_files:
-                self.add_text_to_output(f"Parsing file: {os.path.basename(inv_file)}\n")
+                self.ui_updater.add_text_to_output(f"Parsing file: {os.path.basename(inv_file)}\n")
 
                 # Use Ansible's inventory manager to parse the file
                 loader = DataLoader()
@@ -238,55 +172,14 @@ class BriefcaseAnsibleTest(toga.App):
 
                 # Format and display the inventory data
                 formatted_data = json.dumps(inventory_data, indent=2)
-                self.add_text_to_output(f"Inventory structure:\n{formatted_data}\n\n")
+                self.ui_updater.add_text_to_output(f"Inventory structure:\n{formatted_data}\n\n")
 
-            self.update_status("Completed")
+            self.ui_updater.update_status("Completed")
 
         # Run the task in a background thread
         self.background_task_runner.run_task(parse_inventory_task, "Parsing inventory...")
 
-    def add_text_to_output(self, text):
-        """Add text to the output view from any thread."""
-        def update_ui():
-            self.output_view.value += text
-
-        # If we're on the main thread, update directly
-        if threading.current_thread() is threading.main_thread():
-            update_ui()
-        else:
-            # Create a direct coroutine for updating the text
-            async def update_text():
-                self.output_view.value += text
-            # Schedule it on the main event loop
-            asyncio.run_coroutine_threadsafe(update_text(), self.main_event_loop)
-
-    def update_status(self, text):
-        """Update the status label from any thread."""
-        def update_ui():
-            self.status_label.text = text
-
-        # If we're on the main thread, update directly
-        if threading.current_thread() is threading.main_thread():
-            update_ui()
-        else:
-            # Create a direct coroutine for updating the status
-            async def update_status_text():
-                self.status_label.text = text
-            # Schedule it on the main event loop
-            asyncio.run_coroutine_threadsafe(update_status_text(), self.main_event_loop)
-
-    def update_output_task(self, text):
-        """Returns an async function that appends text to the output view."""
-        async def update_output(interface):
-            current_text = self.output_view.value
-            self.output_view.value = current_text + text
-        return update_output
-
-    def update_status_task(self, text):
-        """Returns an async function that updates the status label."""
-        async def update_status_async(interface):
-            self.status_label.text = text
-        return update_status_async
+    # Using UIUpdater from ui.py for text and status updates
 
     def parse_ansible_playbook(self, widget):
         """Parse the sample ansible playbook file using Ansible's DataLoader."""
@@ -295,7 +188,7 @@ class BriefcaseAnsibleTest(toga.App):
             # Path to the playbook file
             playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
 
-            self.add_text_to_output("Parsing file: sample_playbook.yml\n")
+            self.ui_updater.add_text_to_output("Parsing file: sample_playbook.yml\n")
 
             # Use Ansible's data loader to parse the YAML file
             loader = DataLoader()
@@ -307,11 +200,11 @@ class BriefcaseAnsibleTest(toga.App):
             playbook_json = json.dumps(playbook_data, indent=2)
 
             # Update the UI with the parsed playbook
-            self.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
+            self.ui_updater.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
 
             # Final update when everything is done
-            self.add_text_to_output("Playbook parsing completed successfully.\n")
-            self.update_status("Completed")
+            self.ui_updater.add_text_to_output("Playbook parsing completed successfully.\n")
+            self.ui_updater.update_status("Completed")
 
         # Run the task in a background thread
         self.background_task_runner.run_task(parse_playbook_task, "Parsing playbook...")
@@ -337,8 +230,8 @@ class BriefcaseAnsibleTest(toga.App):
                 inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
                 playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
 
-                self.add_text_to_output("Loading inventory: sample_inventory.ini\n")
-                self.add_text_to_output("Loading playbook: sample_playbook.yml\n")
+                self.ui_updater.add_text_to_output("Loading inventory: sample_inventory.ini\n")
+                self.ui_updater.add_text_to_output("Loading playbook: sample_playbook.yml\n")
 
                 # Create data loader
                 loader = DataLoader()
@@ -351,7 +244,7 @@ class BriefcaseAnsibleTest(toga.App):
                 variable_manager = VariableManager(loader=loader, inventory=inventory)
 
                 # Configure connection to use paramiko
-                self.add_text_to_output("Configuring Ansible to use Paramiko SSH connections\n")
+                self.ui_updater.add_text_to_output("Configuring Ansible to use Paramiko SSH connections\n")
 
                 # Define a subclass of CallbackBase to capture output
                 from ansible.plugins.callback import CallbackBase
@@ -388,7 +281,7 @@ class BriefcaseAnsibleTest(toga.App):
                         self.output_callback(f"⏳ Running task: {name}\n")
 
                 # Create a custom callback to receive events
-                results_callback = ResultCallback(self.add_text_to_output)
+                results_callback = ResultCallback(self.ui_updater.add_text_to_output)
 
                 # Import necessary modules
                 from ansible.executor.playbook_executor import PlaybookExecutor
@@ -419,7 +312,7 @@ class BriefcaseAnsibleTest(toga.App):
                     host_key_checking=False   # Disable host key checking
                 )
 
-                self.add_text_to_output("Setting up playbook executor...\n")
+                self.ui_updater.add_text_to_output("Setting up playbook executor...\n")
 
                 # Create playbook executor without passing options directly
                 pbex = PlaybookExecutor(
@@ -434,23 +327,23 @@ class BriefcaseAnsibleTest(toga.App):
                 if pbex._tqm is not None:
                     pbex._tqm._stdout_callback = results_callback
 
-                self.add_text_to_output("Starting playbook execution with Paramiko transport...\n\n")
+                self.ui_updater.add_text_to_output("Starting playbook execution with Paramiko transport...\n\n")
 
                 # Run the playbook
                 result = pbex.run()
 
                 if result == 0:
-                    self.add_text_to_output("\n✨ Playbook execution completed successfully.\n")
-                    self.update_status("Completed")
+                    self.ui_updater.add_text_to_output("\n✨ Playbook execution completed successfully.\n")
+                    self.ui_updater.update_status("Completed")
                 else:
-                    self.add_text_to_output(f"\n⚠️ Playbook execution failed with code {result}.\n")
-                    self.update_status("Failed")
+                    self.ui_updater.add_text_to_output(f"\n⚠️ Playbook execution failed with code {result}.\n")
+                    self.ui_updater.update_status("Failed")
 
             except Exception as error:
                 # Handle any exceptions
                 error_message = str(error)
-                self.add_text_to_output(f"Error executing playbook: {error_message}")
-                self.update_status("Error")
+                self.ui_updater.add_text_to_output(f"Error executing playbook: {error_message}")
+                self.ui_updater.update_status("Error")
 
         # Run the task in a background thread
         self.background_task_runner.run_task(run_in_background, "Running sample playbook...")
@@ -512,8 +405,8 @@ class BriefcaseAnsibleTest(toga.App):
 
                 # Path to the inventory file
                 inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
-                self.add_text_to_output("Using inventory: " + inventory_file + "\n")
-                self.add_text_to_output("Target: night2\n\n")
+                self.ui_updater.add_text_to_output("Using inventory: " + inventory_file + "\n")
+                self.ui_updater.add_text_to_output("Target: night2\n\n")
 
                 # Setup Ansible objects
                 loader = DataLoader()
@@ -545,7 +438,7 @@ class BriefcaseAnsibleTest(toga.App):
                 play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
 
                 # Create callback for output
-                results_callback = ResultCallback(self.add_text_to_output)
+                results_callback = ResultCallback(self.ui_updater.add_text_to_output)
 
                 # Run it
                 tqm = None
@@ -560,18 +453,18 @@ class BriefcaseAnsibleTest(toga.App):
                     result = tqm.run(play)
 
                     if result == 0:
-                        self.update_status("Success")
+                        self.ui_updater.update_status("Success")
                     else:
-                        self.update_status("Failed")
+                        self.ui_updater.update_status("Failed")
 
                 finally:
                     if tqm is not None:
                         tqm.cleanup()
 
             except Exception as error:
-                self.add_text_to_output(f"Error running Ansible ping: {str(error)}\n")
-                self.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
-                self.update_status("Error")
+                self.ui_updater.add_text_to_output(f"Error running Ansible ping: {str(error)}\n")
+                self.ui_updater.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
+                self.ui_updater.update_status("Error")
 
         # Run the task in a background thread
         self.background_task_runner.run_task(run_in_background, "Running Ansible ping test...")
