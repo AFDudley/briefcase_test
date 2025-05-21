@@ -7,7 +7,6 @@ that might not be available on all platforms (particularly iOS).
 
 import os
 import sys
-import stat
 import getpass
 
 
