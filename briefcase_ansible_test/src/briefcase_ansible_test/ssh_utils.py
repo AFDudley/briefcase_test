@@ -189,4 +189,101 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
             ui_updater.update_status("Error")
         return False
 
-# Function removed as requested
+def create_ssh_directory(app_path):
+    """
+    Create a directory for SSH keys if it doesn't exist.
+    
+    Args:
+        app_path: The application path to use as base directory
+        
+    Returns:
+        str: Path to the SSH directory
+    """
+    ssh_dir = os.path.join(app_path, 'resources', 'ssh')
+    if not os.path.exists(ssh_dir):
+        os.makedirs(ssh_dir, exist_ok=True)
+    return ssh_dir
+
+def generate_ed25519_key(app_path, ui_updater=None):
+    """
+    Generate a new ED25519 SSH key and save it to the app resources.
+    
+    Args:
+        app_path: The application path to use as base directory
+        ui_updater: Optional UI updater for showing progress
+        
+    Returns:
+        tuple: (success, private_key_path, public_key_path, public_key_str)
+    """
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.hazmat.primitives import serialization
+        import paramiko
+        
+        if ui_updater:
+            ui_updater.add_text_to_output("Generating new ED25519 key pair...\n")
+        
+        # Create the SSH directory
+        ssh_dir = create_ssh_directory(app_path)
+        
+        # Generate a new ED25519 private key
+        private_key = ed25519.Ed25519PrivateKey.generate()
+        
+        # Get the public key (used to create the public key file)
+        private_key.public_key()
+        
+        # Serialize the private key to PEM format
+        private_key_pem = private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.OpenSSH,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        
+        # Save the private key
+        private_key_path = os.path.join(ssh_dir, 'id_ed25519')
+        with open(private_key_path, 'wb') as f:
+            f.write(private_key_pem)
+        
+        # Make sure permissions are set correctly (600)
+        os.chmod(private_key_path, 0o600)
+        
+        # Create the public key in OpenSSH format
+        # We'll use paramiko to help with this
+        pk = paramiko.Ed25519Key(data=private_key_pem)
+        public_key_str = f"{pk.get_name()} {pk.get_base64()} ansible-briefcase-app"
+        
+        # Save the public key
+        public_key_path = os.path.join(ssh_dir, 'id_ed25519.pub')
+        with open(public_key_path, 'w') as f:
+            f.write(public_key_str)
+            f.write('\n')
+        
+        # Display information if ui_updater is provided
+        if ui_updater:
+            ui_updater.add_text_to_output("Generated ED25519 key pair:\n")
+            ui_updater.add_text_to_output(f"Private key: {private_key_path}\n")
+            ui_updater.add_text_to_output(f"Public key: {public_key_path}\n\n")
+            
+            ui_updater.add_text_to_output("Public Key (add this to authorized_keys on your server):\n")
+            ui_updater.add_text_to_output(f"{public_key_str}\n\n")
+            
+            # Display fingerprint
+            fingerprint = pk.get_fingerprint().hex()
+            ui_updater.add_text_to_output(f"Key Fingerprint: {':'.join([fingerprint[i:i+2] for i in range(0, len(fingerprint), 2)])}\n")
+            ui_updater.update_status("Key Generated")
+        
+        return True, private_key_path, public_key_path, public_key_str
+        
+    except ImportError as e:
+        if ui_updater:
+            ui_updater.add_text_to_output(f"Error importing required modules: {str(e)}\n")
+            ui_updater.add_text_to_output("Make sure 'cryptography' and 'paramiko' are installed.\n")
+            ui_updater.update_status("Failed")
+        return False, None, None, None
+        
+    except Exception as e:
+        if ui_updater:
+            ui_updater.add_text_to_output(f"Error generating key: {str(e)}\n")
+            ui_updater.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
+            ui_updater.update_status("Error")
+        return False, None, None, None
