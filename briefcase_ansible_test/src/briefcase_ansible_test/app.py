@@ -54,8 +54,17 @@ class BriefcaseAnsibleTest(toga.App):
         """Initialize the application."""
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
-        # Create and add action buttons
-        action_buttons = self.create_action_buttons()
+        # Define button configurations as tuples: (label, callback, tooltip)
+        button_configs = [
+            ('Parse Inventory', self.parse_ansible_inventory, 'Parse Ansible inventory files'),
+            ('Parse Playbook', self.parse_ansible_playbook, 'Parse Ansible playbook files'),
+            ('Test Paramiko', self.test_paramiko_connection, 'Test SSH connection using Paramiko'),
+            ('Run Playbook (Paramiko)', self.run_ansible_playbook, 'Run Ansible playbook using Paramiko'),
+            ('Ansible Ping Test', self.ansible_ping_test, 'Run Ansible ping test'),
+        ]
+        
+        # Create action buttons using UIComponents
+        action_buttons = UIComponents.create_action_buttons(self, button_configs)
 
         # Create output area and status label
         self.output_view, self.status_label = UIComponents.create_output_area()
@@ -80,49 +89,6 @@ class BriefcaseAnsibleTest(toga.App):
     # Using the UIComponents class from ui.py instead of local methods
 
     # Using BackgroundTaskRunner from ui.py instead of local run_background_task method
-
-    def create_action_buttons(self):
-        """Create and return all action buttons used in the application."""
-        buttons = []
-
-        # Button to parse Ansible inventory
-        buttons.append(toga.Button(
-            'Parse Inventory',
-            on_press=self.parse_ansible_inventory,
-            style=Pack(margin=5)
-        ))
-
-        # Button to parse Ansible playbook
-        buttons.append(toga.Button(
-            'Parse Playbook',
-            on_press=self.parse_ansible_playbook,
-            style=Pack(margin=5)
-        ))
-
-        # Button to test Paramiko SSH
-        buttons.append(toga.Button(
-            'Test Paramiko',
-            on_press=self.test_paramiko_connection,
-            style=Pack(margin=5)
-        ))
-
-        # Button to run the sample playbook with Paramiko
-        buttons.append(toga.Button(
-            'Run Playbook (Paramiko)',
-            on_press=self.run_ansible_playbook,
-            style=Pack(margin=5)
-        ))
-
-        # Button to run Ansible ping test
-        buttons.append(toga.Button(
-            'Ansible Ping Test',
-            on_press=self.ansible_ping_test,
-            style=Pack(margin=5)
-        ))
-
-        # SSH key buttons removed
-
-        return buttons
 
     def parse_ansible_inventory(self, widget):
         """Parse Ansible inventory files using InventoryManager directly."""

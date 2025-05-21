@@ -29,6 +29,33 @@ class UIComponents:
         return output_view, status_label
     
     @staticmethod
+    def create_action_buttons(app, button_configs):
+        """Create and return action buttons for the application.
+        
+        Args:
+            app: The app instance providing callback methods
+            button_configs: Button configurations as list of tuples.
+                           Each tuple should contain (label, callback, tooltip).
+            
+        Returns:
+            A list of Toga Button widgets
+            
+        Raises:
+            ValueError: If button_configs is None or empty
+        """
+        if not button_configs:
+            raise ValueError("Button configurations must be provided")
+        
+        # Create buttons from configuration tuples
+        return [
+            toga.Button(
+                label,
+                on_press=callback,
+                style=Pack(margin=5)
+            ) for label, callback, _ in button_configs
+        ]
+    
+    @staticmethod
     def create_main_layout(title, action_buttons, output_view, status_label):
         """Create and return the main layout with all UI components."""
         # Main box with vertical layout
