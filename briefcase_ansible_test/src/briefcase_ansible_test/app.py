@@ -60,7 +60,7 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_event_loop = asyncio.get_event_loop()
         # Define button configurations as tuples: (label, callback, tooltip)
         button_configs = [
-            ('Parse Inventory', self.parse_ansible_inventory, 'Parse Ansible inventory files'),
+            ('Parse Inventory', lambda widget: parse_ansible_inventory(self, widget), 'Parse Ansible inventory files'),
             ('Parse Playbook', self.parse_ansible_playbook, 'Parse Ansible playbook files'),
             ('Test Paramiko', self.test_paramiko_connection, 'Test SSH connection using Paramiko'),
             ('Run Playbook (Paramiko)', self.run_ansible_playbook, 'Run Ansible playbook using Paramiko'),
@@ -89,11 +89,6 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_window.content = main_box
         self.main_window.size = (600, 400)
         self.main_window.show()
-
-    def parse_ansible_inventory(self, widget):
-        """Parse Ansible inventory files using InventoryManager directly."""
-        # Call the imported function with self as the app parameter
-        parse_ansible_inventory(self, widget)
 
     # Using UIUpdater from ui.py for text and status updates
 
