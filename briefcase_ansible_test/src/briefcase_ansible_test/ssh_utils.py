@@ -28,8 +28,8 @@ def patch_paramiko_for_async():
             def close(self):
                 pass
         
-        # Add the class to the module
-        sftp_file_module.SFTPFile = SFTPFile
+        # Add the class to the module - we need to use setattr for type checking
+        setattr(sftp_file_module, 'SFTPFile', SFTPFile)
         sys.modules['paramiko.sftp_file'] = sftp_file_module
         
         # Fix for MutableMapping in Python 3.10+
@@ -37,8 +37,9 @@ def patch_paramiko_for_async():
             if 'collections' in sys.modules:
                 import collections
                 from collections.abc import MutableMapping
+                # Use hasattr check and setattr for type checking
                 if not hasattr(collections, 'MutableMapping'):
-                    collections.MutableMapping = MutableMapping
+                    setattr(collections, 'MutableMapping', MutableMapping)
         
         return True
     except Exception as e:
@@ -50,23 +51,19 @@ def import_paramiko():
     Safely import Paramiko after applying necessary patches.
     
     Returns:
-        tuple: (success, paramiko_module)
+        The imported paramiko module
+    
+    Raises:
+        ImportError: If Paramiko cannot be imported
     """
     # Apply patch first
     patched = patch_paramiko_for_async()
+    if not patched:
+        raise ImportError("Failed to apply Paramiko patches")
     
-    try:
-        import paramiko
-        return True, paramiko
-    except SyntaxError as e:
-        print(f"SyntaxError importing Paramiko: {e}")
-        return False, None
-    except ImportError as e:
-        print(f"ImportError importing Paramiko: {e}")
-        return False, None
-    except Exception as e:
-        print(f"Unexpected error importing Paramiko: {e}")
-        return False, None
+    # Import paramiko - let any exceptions propagate
+    import paramiko
+    return paramiko
 
 def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=None):
     """
@@ -82,10 +79,11 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
     Returns:
         bool: True if connection test was successful, False otherwise
     """
-    success, paramiko = import_paramiko()
-    if not success:
+    try:
+        paramiko = import_paramiko()
+    except ImportError as e:
         if ui_updater:
-            ui_updater.add_text_to_output("Failed to import Paramiko\n")
+            ui_updater.add_text_to_output(f"Failed to import Paramiko: {str(e)}\n")
             ui_updater.update_status("Failed")
         return False
     
