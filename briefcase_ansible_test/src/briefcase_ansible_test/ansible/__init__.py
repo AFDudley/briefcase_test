@@ -16,6 +16,13 @@ from briefcase_ansible_test.utils.system_utils import (
     setup_grp_module_mock,
 )
 
+# Import SSH utilities for Paramiko patching
+from briefcase_ansible_test.ssh_utils import patch_paramiko_for_async
+
+# Apply patch for Paramiko's async keyword issue - needed before Ansible imports
+# that might indirectly use Paramiko for SSH connections
+patch_paramiko_for_async()
+
 # Define functions needed for Ansible mocks
 
 

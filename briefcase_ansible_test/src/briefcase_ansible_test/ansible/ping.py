@@ -8,18 +8,6 @@ import os
 import threading
 import traceback
 
-# Ensure system mocks are set up before importing Ansible
-from briefcase_ansible_test.utils.system_utils import (
-    patch_getpass,
-    setup_pwd_module_mock,
-    setup_grp_module_mock,
-)
-
-# Apply patches that might be needed by Ansible imports
-patch_getpass()
-setup_pwd_module_mock()
-setup_grp_module_mock()
-
 
 def ansible_ping_test_with_key(self, widget):
     """

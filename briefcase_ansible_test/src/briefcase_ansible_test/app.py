@@ -2,48 +2,24 @@
 A simple app to parse and display Ansible inventory using Ansible's InventoryManager
 """
 
-import os
-
-# Import and apply system utilities first, before any other imports
-from briefcase_ansible_test.utils.system_utils import (
-    patch_getpass,
-    setup_pwd_module_mock,
-    setup_grp_module_mock
-)
-
-# Import ansible module first - its __init__.py will set up ansible-specific mocks
-import briefcase_ansible_test.ansible
-
-# Setup remaining module mocks needed for cross-platform compatibility
-# These MUST be called before any other imports that might need them
-patch_getpass()
-setup_pwd_module_mock()
-setup_grp_module_mock()
-
-# Now import SSH utilities
-from briefcase_ansible_test.ssh_utils import (
-    patch_paramiko_for_async,
-    test_ssh_connection
-)
-
-# Apply patch for Paramiko's async keyword issue
-patch_paramiko_for_async()
-
 # Standard library imports
-import toga
 import asyncio
 import json
+import os
 import traceback
 
-# Import UI components
-from briefcase_ansible_test.ui import UIComponents, UIUpdater, BackgroundTaskRunner
+# Import ansible module first - its __init__.py will set up all required system mocks
+import briefcase_ansible_test.ansible
 
-# Import Ansible utilities from the module
-from briefcase_ansible_test.ansible import parse_ansible_inventory, ansible_ping_test_with_key
-
-# Import Ansible modules directly - skip CLI
+# Third-party imports
+import toga
 from ansible.inventory.manager import InventoryManager
 from ansible.parsing.dataloader import DataLoader
+
+# Local application imports
+from briefcase_ansible_test.ansible import parse_ansible_inventory
+from briefcase_ansible_test.ssh_utils import test_ssh_connection
+from briefcase_ansible_test.ui import BackgroundTaskRunner, UIComponents, UIUpdater
 
 
 class BriefcaseAnsibleTest(toga.App):
@@ -59,11 +35,27 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_event_loop = asyncio.get_event_loop()
         # Define button configurations as tuples: (label, callback, tooltip)
         button_configs = [
-            ('Parse Inventory', lambda widget: parse_ansible_inventory(self, widget), 'Parse Ansible inventory files'),
-            ('Parse Playbook', self.parse_ansible_playbook, 'Parse Ansible playbook files'),
-            ('Test Paramiko', self.test_paramiko_connection, 'Test SSH connection using Paramiko'),
-            ('Run Playbook (Paramiko)', self.run_ansible_playbook, 'Run Ansible playbook using Paramiko'),
-            ('Ansible Ping Test', self.ansible_ping_test, 'Run Ansible ping test'),
+            (
+                "Parse Inventory",
+                lambda widget: parse_ansible_inventory(self, widget),
+                "Parse Ansible inventory files",
+            ),
+            (
+                "Parse Playbook",
+                self.parse_ansible_playbook,
+                "Parse Ansible playbook files",
+            ),
+            (
+                "Test Paramiko",
+                self.test_paramiko_connection,
+                "Test SSH connection using Paramiko",
+            ),
+            (
+                "Run Playbook (Paramiko)",
+                self.run_ansible_playbook,
+                "Run Ansible playbook using Paramiko",
+            ),
+            ("Ansible Ping Test", self.ansible_ping_test, "Run Ansible ping test"),
         ]
 
         # Create action buttons using UIComponents
@@ -73,15 +65,21 @@ class BriefcaseAnsibleTest(toga.App):
         self.output_view, self.status_label = UIComponents.create_output_area()
 
         # Create UI updater and background task runner
-        self.ui_updater = UIUpdater(self.output_view, self.status_label, self.main_event_loop)
+        self.ui_updater = UIUpdater(
+            self.output_view, self.status_label, self.main_event_loop
+        )
         self.background_task_runner = BackgroundTaskRunner(self.ui_updater)
 
         # Make sure background_task_runner uses our task set
         self.background_task_runner.background_tasks = self.background_tasks
 
         # Create main layout with all components
-        main_box = UIComponents.create_main_layout('Ansible Inventory Viewer', action_buttons,
-                                                 self.output_view, self.status_label)
+        main_box = UIComponents.create_main_layout(
+            "Ansible Inventory Viewer",
+            action_buttons,
+            self.output_view,
+            self.status_label,
+        )
 
         # Create and show the main window
         self.main_window = toga.MainWindow(title=self.formal_name)
@@ -96,7 +94,9 @@ class BriefcaseAnsibleTest(toga.App):
 
         def parse_playbook_task():
             # Path to the playbook file
-            playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
+            playbook_file = os.path.join(
+                self.paths.app, "resources", "playbooks", "sample_playbook.yml"
+            )
 
             self.ui_updater.add_text_to_output("Parsing file: sample_playbook.yml\n")
 
@@ -113,7 +113,9 @@ class BriefcaseAnsibleTest(toga.App):
             self.ui_updater.add_text_to_output(f"Parsed data:\n{playbook_json}\n\n")
 
             # Final update when everything is done
-            self.ui_updater.add_text_to_output("Playbook parsing completed successfully.\n")
+            self.ui_updater.add_text_to_output(
+                "Playbook parsing completed successfully.\n"
+            )
             self.ui_updater.update_status("Completed")
 
         # Run the task in a background thread
@@ -121,27 +123,43 @@ class BriefcaseAnsibleTest(toga.App):
 
     def test_paramiko_connection(self, widget):
         """Test a basic Paramiko SSH connection."""
+
         # Run in background to keep UI responsive
         def run_in_background():
             # Get path to the SSH key
-            key_path = os.path.join(self.paths.app, 'resources', 'keys', 'briefcase_test_key')
+            key_path = os.path.join(
+                self.paths.app, "resources", "keys", "briefcase_test_key"
+            )
             # Run the SSH test with our UI updater and the key path
-            test_ssh_connection('night2', 'mtm', key_path=key_path, ui_updater=self.ui_updater)
+            test_ssh_connection(
+                "night2", "mtm", key_path=key_path, ui_updater=self.ui_updater
+            )
 
         # Run the task in a background thread
-        self.background_task_runner.run_task(run_in_background, "Testing Paramiko connection...")
+        self.background_task_runner.run_task(
+            run_in_background, "Testing Paramiko connection..."
+        )
 
     def run_ansible_playbook(self, widget):
         """Run the sample Ansible playbook using Paramiko for SSH connections."""
+
         # Run in a background thread to keep UI responsive
         def run_in_background():
             try:
                 # Path to the files
-                inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
-                playbook_file = os.path.join(self.paths.app, 'resources', 'playbooks', 'sample_playbook.yml')
+                inventory_file = os.path.join(
+                    self.paths.app, "resources", "inventory", "sample_inventory.ini"
+                )
+                playbook_file = os.path.join(
+                    self.paths.app, "resources", "playbooks", "sample_playbook.yml"
+                )
 
-                self.ui_updater.add_text_to_output("Loading inventory: sample_inventory.ini\n")
-                self.ui_updater.add_text_to_output("Loading playbook: sample_playbook.yml\n")
+                self.ui_updater.add_text_to_output(
+                    "Loading inventory: sample_inventory.ini\n"
+                )
+                self.ui_updater.add_text_to_output(
+                    "Loading playbook: sample_playbook.yml\n"
+                )
 
                 # Create data loader
                 loader = DataLoader()
@@ -151,10 +169,13 @@ class BriefcaseAnsibleTest(toga.App):
 
                 # Set up variable manager
                 from ansible.vars.manager import VariableManager
+
                 variable_manager = VariableManager(loader=loader, inventory=inventory)
 
                 # Configure connection to use paramiko
-                self.ui_updater.add_text_to_output("Configuring Ansible to use Paramiko SSH connections\n")
+                self.ui_updater.add_text_to_output(
+                    "Configuring Ansible to use Paramiko SSH connections\n"
+                )
 
                 # Define a subclass of CallbackBase to capture output
                 from ansible.plugins.callback import CallbackBase
@@ -168,14 +189,16 @@ class BriefcaseAnsibleTest(toga.App):
                         host = result._host.get_name()
                         task = result._task.get_name()
                         self.output_callback(f"✅ {host} | {task} => SUCCESS\n")
-                        if 'msg' in result._result:
-                            self.output_callback(f"   Message: {result._result['msg']}\n")
+                        if "msg" in result._result:
+                            self.output_callback(
+                                f"   Message: {result._result['msg']}\n"
+                            )
 
                     def v2_runner_on_failed(self, result, ignore_errors=False):
                         host = result._host.get_name()
                         task = result._task.get_name()
                         self.output_callback(f"❌ {host} | {task} => FAILED\n")
-                        if 'msg' in result._result:
+                        if "msg" in result._result:
                             self.output_callback(f"   Error: {result._result['msg']}\n")
 
                     def v2_runner_on_unreachable(self, result):
@@ -200,26 +223,26 @@ class BriefcaseAnsibleTest(toga.App):
 
                 # Set context.CLIARGS which PlaybookExecutor will use internally
                 context.CLIARGS = ImmutableDict(
-                    connection='paramiko',    # Use paramiko for SSH connections
+                    connection="paramiko",  # Use paramiko for SSH connections
                     module_path=None,
-                    forks=1,                  # Run tasks serially
+                    forks=1,  # Run tasks serially
                     become=None,
                     become_method=None,
                     become_user=None,
-                    check=False,              # Don't perform a dry-run
-                    syntax=False,             # Don't just check syntax
-                    diff=False,               # Don't show file diffs
-                    verbosity=0,              # Minimal output
+                    check=False,  # Don't perform a dry-run
+                    syntax=False,  # Don't just check syntax
+                    diff=False,  # Don't show file diffs
+                    verbosity=0,  # Minimal output
                     listhosts=False,
                     listtasks=False,
                     listtags=False,
-                    ssh_common_args='',
-                    ssh_extra_args='',
-                    sftp_extra_args='',
-                    scp_extra_args='',
+                    ssh_common_args="",
+                    ssh_extra_args="",
+                    sftp_extra_args="",
+                    scp_extra_args="",
                     become_ask_pass=False,
                     remote_user=None,
-                    host_key_checking=False   # Disable host key checking
+                    host_key_checking=False,  # Disable host key checking
                 )
 
                 self.ui_updater.add_text_to_output("Setting up playbook executor...\n")
@@ -230,37 +253,47 @@ class BriefcaseAnsibleTest(toga.App):
                     inventory=inventory,
                     variable_manager=variable_manager,
                     loader=loader,
-                    passwords={}
+                    passwords={},
                 )
 
                 # Register our callback if _tqm is available
                 if pbex._tqm is not None:
                     pbex._tqm._stdout_callback = results_callback
 
-                self.ui_updater.add_text_to_output("Starting playbook execution with Paramiko transport...\n\n")
+                self.ui_updater.add_text_to_output(
+                    "Starting playbook execution with Paramiko transport...\n\n"
+                )
 
                 # Run the playbook
                 result = pbex.run()
 
                 if result == 0:
-                    self.ui_updater.add_text_to_output("\n✨ Playbook execution completed successfully.\n")
+                    self.ui_updater.add_text_to_output(
+                        "\n✨ Playbook execution completed successfully.\n"
+                    )
                     self.ui_updater.update_status("Completed")
                 else:
-                    self.ui_updater.add_text_to_output(f"\n⚠️ Playbook execution failed with code {result}.\n")
+                    self.ui_updater.add_text_to_output(
+                        f"\n⚠️ Playbook execution failed with code {result}.\n"
+                    )
                     self.ui_updater.update_status("Failed")
 
             except Exception as error:
                 # Handle any exceptions
                 error_message = str(error)
-                self.ui_updater.add_text_to_output(f"Error executing playbook: {error_message}")
+                self.ui_updater.add_text_to_output(
+                    f"Error executing playbook: {error_message}"
+                )
                 self.ui_updater.update_status("Error")
 
         # Run the task in a background thread
-        self.background_task_runner.run_task(run_in_background, "Running sample playbook...")
-
+        self.background_task_runner.run_task(
+            run_in_background, "Running sample playbook..."
+        )
 
     def ansible_ping_test(self, widget):
         """Run an Ansible ping module against night2 to verify SSH connectivity."""
+
         # Run in a background thread to keep UI responsive
         def run_in_background():
             try:
@@ -288,12 +321,18 @@ class BriefcaseAnsibleTest(toga.App):
                         self.host_ok[host] = result
                         output = f"{host} | SUCCESS => {{\n"
                         output += f"    \"changed\": {str(result._result.get('changed', False)).lower()},\n"
-                        if 'ansible_facts' in result._result:
-                            output += "    \"ansible_facts\": {\n"
-                            for k, v in result._result['ansible_facts'].items():
-                                output += "        \"" + str(k) + "\": \"" + str(v) + "\",\n"
+                        if "ansible_facts" in result._result:
+                            output += '    "ansible_facts": {\n'
+                            for k, v in result._result["ansible_facts"].items():
+                                output += (
+                                    '        "' + str(k) + '": "' + str(v) + '",\n'
+                                )
                             output += "    },\n"
-                        output += "    \"ping\": \"" + str(result._result.get('ping', '')) + "\"\n"
+                        output += (
+                            '    "ping": "'
+                            + str(result._result.get("ping", ""))
+                            + '"\n'
+                        )
                         output += "}\n"
                         self.output_callback(output)
 
@@ -301,21 +340,33 @@ class BriefcaseAnsibleTest(toga.App):
                         host = result._host.get_name()
                         self.host_failed[host] = result
                         output = f"{host} | FAILED => {{\n"
-                        output += "    \"msg\": \"" + str(result._result.get('msg', 'unknown error')) + "\"\n"
+                        output += (
+                            '    "msg": "'
+                            + str(result._result.get("msg", "unknown error"))
+                            + '"\n'
+                        )
                         output += "}\n"
                         self.output_callback(output)
 
                     def v2_runner_on_unreachable(self, result):
-                                            host = result._host.get_name()
-                                            self.host_unreachable[host] = result
-                                            output = host + " | UNREACHABLE => {\n"
-                                            output += "    \"msg\": \"" + str(result._result.get('msg', 'unreachable')) + "\"\n"
-                                            output += "}\n"
-                                            self.output_callback(output)
+                        host = result._host.get_name()
+                        self.host_unreachable[host] = result
+                        output = host + " | UNREACHABLE => {\n"
+                        output += (
+                            '    "msg": "'
+                            + str(result._result.get("msg", "unreachable"))
+                            + '"\n'
+                        )
+                        output += "}\n"
+                        self.output_callback(output)
 
                 # Path to the inventory file
-                inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
-                self.ui_updater.add_text_to_output("Using inventory: " + inventory_file + "\n")
+                inventory_file = os.path.join(
+                    self.paths.app, "resources", "inventory", "sample_inventory.ini"
+                )
+                self.ui_updater.add_text_to_output(
+                    "Using inventory: " + inventory_file + "\n"
+                )
                 self.ui_updater.add_text_to_output("Target: night2\n\n")
 
                 # Setup Ansible objects
@@ -325,7 +376,7 @@ class BriefcaseAnsibleTest(toga.App):
 
                 # Create and configure options
                 context.CLIARGS = ImmutableDict(
-                    connection='ssh',
+                    connection="ssh",
                     module_path=[],
                     forks=10,
                     become=None,
@@ -333,7 +384,7 @@ class BriefcaseAnsibleTest(toga.App):
                     become_user=None,
                     check=False,
                     diff=False,
-                    verbosity=0
+                    verbosity=0,
                 )
 
                 # Create play with ping task
@@ -341,11 +392,13 @@ class BriefcaseAnsibleTest(toga.App):
                     name="Ansible Ping",
                     hosts="night2",
                     gather_facts=False,
-                    tasks=[dict(action=dict(module='ping'))]
+                    tasks=[dict(action=dict(module="ping"))],
                 )
 
                 # Create the Play
-                play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
+                play = Play().load(
+                    play_source, variable_manager=variable_manager, loader=loader
+                )
 
                 # Create callback for output
                 results_callback = ResultCallback(self.ui_updater.add_text_to_output)
@@ -358,7 +411,7 @@ class BriefcaseAnsibleTest(toga.App):
                         variable_manager=variable_manager,
                         loader=loader,
                         passwords=dict(),
-                        stdout_callback=results_callback
+                        stdout_callback=results_callback,
                     )
                     result = tqm.run(play)
 
@@ -372,12 +425,19 @@ class BriefcaseAnsibleTest(toga.App):
                         tqm.cleanup()
 
             except Exception as error:
-                self.ui_updater.add_text_to_output(f"Error running Ansible ping: {str(error)}\n")
-                self.ui_updater.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
+                self.ui_updater.add_text_to_output(
+                    f"Error running Ansible ping: {str(error)}\n"
+                )
+                self.ui_updater.add_text_to_output(
+                    f"Traceback: {traceback.format_exc()}\n"
+                )
                 self.ui_updater.update_status("Error")
 
         # Run the task in a background thread
-        self.background_task_runner.run_task(run_in_background, "Running Ansible ping test...")
+        self.background_task_runner.run_task(
+            run_in_background, "Running Ansible ping test..."
+        )
+
 
 def main():
     # Return the app instance without calling main_loop()

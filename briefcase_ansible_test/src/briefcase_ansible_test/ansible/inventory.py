@@ -7,17 +7,6 @@ This module contains functions for parsing and manipulating Ansible inventory fi
 import os
 import json
 
-# Ensure system mocks are set up before importing Ansible
-from briefcase_ansible_test.utils.system_utils import (
-    patch_getpass,
-    setup_pwd_module_mock,
-    setup_grp_module_mock,
-)
-
-# Apply patches that might be needed by Ansible imports
-patch_getpass()
-setup_pwd_module_mock()
-setup_grp_module_mock()
 
 # Now import Ansible modules
 from ansible.inventory.manager import InventoryManager
