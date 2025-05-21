@@ -4,14 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a cross-platform Python application called "briefcase_ansible_test" created using [Briefcase](https://briefcase.readthedocs.io/), a packaging tool from the [BeeWare](https://beeware.org/) project. The app is intended to test running Ansible within a Briefcase application.
+This is a Python application called "briefcase_ansible_test" created using [Briefcase](https://briefcase.readthedocs.io/), a packaging tool from the [BeeWare](https://beeware.org/) project. The app is specifically designed to test running Ansible within an iOS application packaged with Briefcase.
 
 ## Architecture
 
-- The application uses [Toga](https://toga.readthedocs.io/) as the UI framework, which provides a platform-native user interface on various platforms.
+- The application uses [Toga](https://toga.readthedocs.io/) as the UI framework, which provides a native user interface on iOS.
+- The application includes workarounds for iOS-specific limitations:
+  - Mocks for system modules missing on iOS (pwd, grp)
+  - Custom implementations of getuser and executable checks for iOS compatibility
+  - Paramiko patches for modern Python compatibility on iOS
 - The main application structure follows Briefcase's standard layout:
   - `app.py` contains the main application class and entry point
   - `__main__.py` handles launching the application when run directly
+  - `ansible.py` contains Ansible-related functionality
+  - `ssh_utils.py` provides SSH connection functionality with Paramiko
+  - `ui.py` contains UI components and helpers for threading
+  - `utils/system_utils.py` contains iOS compatibility utilities
 
 ## Development Commands
 
@@ -78,11 +86,17 @@ briefcase package -p macOS
 
 ## Platform-Specific Notes
 
-- The application is configured for multiple platforms:
-  - macOS (using Toga-Cocoa)
-  - Linux (using Toga-GTK)
-  - Windows (using Toga-WinForms)
-  - iOS (using Toga-iOS)
-  - Android (using Toga-Android)
-  - Web (using Toga-Web)
-- Each platform has specific dependencies defined in pyproject.toml
+- While Briefcase supports multiple platforms, this application focuses specifically on iOS:
+  - The app demonstrates how to overcome iOS limitations and restrictions while providing Ansible functionality
+  - Special configurations are made for iOS-specific dependencies in pyproject.toml
+  - Contains workarounds for running SSH and Ansible operations within iOS sandbox restrictions
+  - Includes mock implementations for system modules not available on iOS
+
+## Key Features
+
+- Parse and display Ansible inventory files
+- Parse Ansible playbooks
+- Test SSH connections using Paramiko with custom patches for iOS
+- Run Ansible playbooks via Paramiko
+- Perform Ansible ping tests against hosts
+- Thread management for responsive UI on iOS
