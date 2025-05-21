@@ -4,7 +4,6 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 
 import os
 import toga
-from toga.style import Pack
 import asyncio
 import json
 import traceback
@@ -62,7 +61,7 @@ class BriefcaseAnsibleTest(toga.App):
             ('Run Playbook (Paramiko)', self.run_ansible_playbook, 'Run Ansible playbook using Paramiko'),
             ('Ansible Ping Test', self.ansible_ping_test, 'Run Ansible ping test'),
         ]
-        
+
         # Create action buttons using UIComponents
         action_buttons = UIComponents.create_action_buttons(self, button_configs)
 
