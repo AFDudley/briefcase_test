@@ -39,8 +39,8 @@ import traceback
 # Import UI components
 from briefcase_ansible_test.ui import UIComponents, UIUpdater, BackgroundTaskRunner
 
-# Import Ansible utilities
-from briefcase_ansible_test.ansible import parse_ansible_inventory
+# Import Ansible utilities from the module
+from briefcase_ansible_test.ansible import parse_ansible_inventory, ansible_ping_test_with_key
 
 # Import Ansible modules directly - skip CLI
 from ansible.inventory.manager import InventoryManager
