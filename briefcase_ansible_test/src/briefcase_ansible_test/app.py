@@ -5,7 +5,6 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 import os
 import toga
 from toga.style import Pack
-import threading
 import asyncio
 import json
 import traceback
@@ -22,7 +21,6 @@ from briefcase_ansible_test.utils.system_utils import (
 # Import SSH utilities
 from briefcase_ansible_test.ssh_utils import (
     patch_paramiko_for_async,
-    import_paramiko,
     test_ssh_connection
 )
 
@@ -65,12 +63,12 @@ class BriefcaseAnsibleTest(toga.App):
         # Create UI updater and background task runner
         self.ui_updater = UIUpdater(self.output_view, self.status_label, self.main_event_loop)
         self.background_task_runner = BackgroundTaskRunner(self.ui_updater)
-        
+
         # Make sure background_task_runner uses our task set
         self.background_task_runner.background_tasks = self.background_tasks
 
         # Create main layout with all components
-        main_box = UIComponents.create_main_layout('Ansible Inventory Viewer', action_buttons, 
+        main_box = UIComponents.create_main_layout('Ansible Inventory Viewer', action_buttons,
                                                  self.output_view, self.status_label)
 
         # Create and show the main window
