@@ -9,16 +9,17 @@ from briefcase_ansible_test.utils.system_utils import (
     patch_getpass,
     setup_pwd_module_mock,
     setup_grp_module_mock,
-    setup_ansible_text_module_mock,
     setup_ansible_basic_module_mock
 )
 
-# Setup all the module mocks needed for cross-platform compatibility
+# Import ansible module first - its __init__.py will set up ansible-specific mocks
+import briefcase_ansible_test.ansible
+
+# Setup remaining module mocks needed for cross-platform compatibility
 # These MUST be called before any other imports that might need them
 patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
-setup_ansible_text_module_mock()
 setup_ansible_basic_module_mock()
 
 # Now import SSH utilities
