@@ -8,8 +8,7 @@ import os
 from briefcase_ansible_test.utils.system_utils import (
     patch_getpass,
     setup_pwd_module_mock,
-    setup_grp_module_mock,
-    setup_ansible_basic_module_mock
+    setup_grp_module_mock
 )
 
 # Import ansible module first - its __init__.py will set up ansible-specific mocks
@@ -20,7 +19,6 @@ import briefcase_ansible_test.ansible
 patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
-setup_ansible_basic_module_mock()
 
 # Now import SSH utilities
 from briefcase_ansible_test.ssh_utils import (
