@@ -12,7 +12,7 @@ import traceback
 from briefcase_ansible_test.utils.system_utils import (
     patch_getpass,
     setup_pwd_module_mock,
-    setup_grp_module_mock
+    setup_grp_module_mock,
 )
 
 # Apply patches that might be needed by Ansible imports
@@ -20,10 +20,11 @@ patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
 
+
 def ansible_ping_test_with_key(self, widget):
     """
     Run an Ansible ping module against night2 using the ED25519 key.
-    
+
     Args:
         self: The application instance
         widget: The widget that triggered this function
@@ -36,8 +37,8 @@ def ansible_ping_test_with_key(self, widget):
     def run_in_background():
         try:
             # Check if we have a key
-            ssh_dir = os.path.join(self.paths.app, 'resources', 'ssh')
-            private_key_path = os.path.join(ssh_dir, 'id_ed25519')
+            ssh_dir = os.path.join(self.paths.app, "resources", "ssh")
+            private_key_path = os.path.join(ssh_dir, "id_ed25519")
 
             if not os.path.exists(private_key_path):
                 self.add_text_to_output("ED25519 private key not found.\n")
@@ -74,10 +75,10 @@ def ansible_ping_test_with_key(self, widget):
                     self.host_ok[host] = result
                     output = f"{host} | SUCCESS => {{\n"
                     output += f"    \"changed\": {str(result._result.get('changed', False)).lower()},\n"
-                    if 'ansible_facts' in result._result:
-                        output += "    \"ansible_facts\": {\n"
-                        for k, v in result._result['ansible_facts'].items():
-                            output += f"        \"{k}\": \"{v}\",\n"
+                    if "ansible_facts" in result._result:
+                        output += '    "ansible_facts": {\n'
+                        for k, v in result._result["ansible_facts"].items():
+                            output += f'        "{k}": "{v}",\n'
                         output += "    },\n"
                     output += f"    \"ping\": \"{result._result.get('ping', '')}\"\n"
                     output += "}\n"
@@ -95,12 +96,16 @@ def ansible_ping_test_with_key(self, widget):
                     host = result._host.get_name()
                     self.host_unreachable[host] = result
                     output = f"{host} | UNREACHABLE => {{\n"
-                    output += f"    \"msg\": \"{result._result.get('msg', 'unreachable')}\"\n"
+                    output += (
+                        f"    \"msg\": \"{result._result.get('msg', 'unreachable')}\"\n"
+                    )
                     output += "}\n"
                     self.output_callback(output)
 
             # Path to the inventory file
-            inventory_file = os.path.join(self.paths.app, 'resources', 'inventory', 'sample_inventory.ini')
+            inventory_file = os.path.join(
+                self.paths.app, "resources", "inventory", "sample_inventory.ini"
+            )
             self.add_text_to_output(f"Using inventory: {inventory_file}\n")
             self.add_text_to_output("Target: night2\n\n")
 
@@ -111,7 +116,7 @@ def ansible_ping_test_with_key(self, widget):
 
             # Create and configure options with SSH key
             context.CLIARGS = ImmutableDict(
-                connection='ssh',
+                connection="ssh",
                 module_path=[],
                 forks=10,
                 become=None,
@@ -120,7 +125,7 @@ def ansible_ping_test_with_key(self, widget):
                 check=False,
                 diff=False,
                 verbosity=0,
-                private_key_file=private_key_path
+                private_key_file=private_key_path,
             )
 
             # private_key_file parameter in CLIARGS will be used by Ansible
@@ -130,11 +135,13 @@ def ansible_ping_test_with_key(self, widget):
                 name="Ansible Ping with ED25519 Key",
                 hosts="night2",
                 gather_facts=False,
-                tasks=[dict(action=dict(module='ping'))]
+                tasks=[dict(action=dict(module="ping"))],
             )
 
             # Create the Play
-            play = Play().load(play_source, variable_manager=variable_manager, loader=loader)
+            play = Play().load(
+                play_source, variable_manager=variable_manager, loader=loader
+            )
 
             # Create callback for output
             results_callback = ResultCallback(self.add_text_to_output)
@@ -147,7 +154,7 @@ def ansible_ping_test_with_key(self, widget):
                     variable_manager=variable_manager,
                     loader=loader,
                     passwords=dict(),
-                    stdout_callback=results_callback
+                    stdout_callback=results_callback,
                 )
 
                 result = tqm.run(play)
