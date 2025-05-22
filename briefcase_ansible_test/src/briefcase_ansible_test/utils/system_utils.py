@@ -8,6 +8,8 @@ that might not be available on all platforms (particularly iOS).
 import os
 import sys
 import getpass
+import threading
+import types
 
 
 def simple_getuser():
@@ -163,3 +165,45 @@ def setup_grp_module_mock():
                 self.getgrnam = GrpModule().getgrnam
 
         sys.modules["grp"] = GrpModuleType()
+
+
+def setup_multiprocessing_mock():
+    """
+    Install comprehensive mocks for multiprocessing modules in sys.modules.
+    
+    This prevents errors when code tries to use multiprocessing features
+    that aren't available on iOS, including the sem_open issue (Python issue 3770).
+    """
+    # Mock the _multiprocessing module with all required components
+    if "_multiprocessing" not in sys.modules:
+        class MultiprocessingModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__("_multiprocessing")
+                # Mock SemLock with threading Lock
+                self.SemLock = threading.Lock
+                # Mock sem_unlink function
+                self.sem_unlink = lambda name: None
+                # Mock Connection
+                self.Connection = object
+        
+        sys.modules["_multiprocessing"] = MultiprocessingModuleType()
+    
+    # Mock the multiprocessing.synchronize module to avoid sem_open issues
+    if "multiprocessing.synchronize" not in sys.modules:
+        class SynchronizeModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__("multiprocessing.synchronize")
+                # Use threading equivalents for all synchronization primitives
+                self.Lock = threading.Lock
+                self.RLock = threading.RLock
+                self.Semaphore = threading.Semaphore
+                self.BoundedSemaphore = threading.BoundedSemaphore
+                self.Event = threading.Event
+                self.Condition = threading.Condition
+                # Mock Barrier (not available in all Python versions)
+                if hasattr(threading, 'Barrier'):
+                    self.Barrier = threading.Barrier
+                else:
+                    self.Barrier = lambda parties: None
+        
+        sys.modules["multiprocessing.synchronize"] = SynchronizeModuleType()

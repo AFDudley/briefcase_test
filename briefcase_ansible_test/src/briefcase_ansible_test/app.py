@@ -3,12 +3,8 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 """
 
 # Standard library imports
-
 import os
 import asyncio
-# Import ansible module first - its __init__.py will set up all required system mocks
-# import briefcase_ansible_test.ansible
-
 
 # Third-party imports
 import toga

@@ -14,6 +14,7 @@ from briefcase_ansible_test.utils.system_utils import (
     patch_getpass,
     setup_pwd_module_mock,
     setup_grp_module_mock,
+    setup_multiprocessing_mock,
 )
 
 # Import SSH utilities for Paramiko patching
@@ -106,6 +107,7 @@ def setup_ansible_basic_module_mock():
 patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
+setup_multiprocessing_mock()
 setup_ansible_text_module_mock()
 setup_ansible_basic_module_mock()
 

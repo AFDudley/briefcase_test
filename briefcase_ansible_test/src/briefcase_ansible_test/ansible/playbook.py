@@ -52,7 +52,7 @@ def parse_ansible_playbook(app, widget):
 
 def run_ansible_playbook(app, widget):
     """
-    Run the sample Ansible playbook using Paramiko for SSH connections.
+    Run the sample Ansible playbook using a simplified Play-based approach.
 
     Args:
         app: The application instance
@@ -70,134 +70,94 @@ def run_ansible_playbook(app, widget):
                 app.paths.app, "resources", "playbooks", "sample_playbook.yml"
             )
 
-            app.ui_updater.add_text_to_output(
-                "Loading inventory: sample_inventory.ini\n"
-            )
-            app.ui_updater.add_text_to_output("Loading playbook: sample_playbook.yml\n")
+            app.ui_updater.add_text_to_output("Loading inventory and playbook...\n")
 
-            # Create data loader
+            # Create data loader and load playbook
             loader = DataLoader()
-
-            # Set up inventory
+            playbook_data = loader.load_from_file(playbook_file)
+            
+            # Set up inventory and variable manager
             inventory = InventoryManager(loader=loader, sources=[inventory_file])
-
-            # Set up variable manager
             from ansible.vars.manager import VariableManager
-
             variable_manager = VariableManager(loader=loader, inventory=inventory)
 
-            # Configure connection to use paramiko
-            app.ui_updater.add_text_to_output(
-                "Configuring Ansible to use Paramiko SSH connections\n"
+            app.ui_updater.add_text_to_output("Setting up Ansible context...\n")
+
+            # Import necessary modules
+            from ansible.playbook.play import Play
+            from ansible.executor.task_queue_manager import TaskQueueManager
+            from ansible.plugins.callback import CallbackBase
+            from ansible import context
+            from ansible.module_utils.common.collections import ImmutableDict
+
+            # Set up context for serial execution
+            context.CLIARGS = ImmutableDict(
+                connection="paramiko",
+                module_path=[],
+                forks=1,
+                become=None,
+                become_method=None,
+                become_user=None,
+                check=False,
+                diff=False,
+                verbosity=0,
+                host_key_checking=False,
             )
 
-            # Define a subclass of CallbackBase to capture output
-            from ansible.plugins.callback import CallbackBase
-
-            class ResultCallback(CallbackBase):
+            # Simple callback for output
+            class SimpleCallback(CallbackBase):
                 def __init__(self, output_callback):
-                    super(ResultCallback, self).__init__()
+                    super().__init__()
                     self.output_callback = output_callback
 
                 def v2_runner_on_ok(self, result):
                     host = result._host.get_name()
                     task = result._task.get_name()
                     self.output_callback(f"✅ {host} | {task} => SUCCESS\n")
-                    if "msg" in result._result:
-                        self.output_callback(f"   Message: {result._result['msg']}\n")
 
                 def v2_runner_on_failed(self, result, ignore_errors=False):
                     host = result._host.get_name()
                     task = result._task.get_name()
                     self.output_callback(f"❌ {host} | {task} => FAILED\n")
-                    if "msg" in result._result:
-                        self.output_callback(f"   Error: {result._result['msg']}\n")
 
-                def v2_runner_on_unreachable(self, result):
-                    host = result._host.get_name()
-                    self.output_callback(f"🔌 {host} => UNREACHABLE\n")
-
-                def v2_playbook_on_play_start(self, play):
-                    name = play.get_name()
-                    self.output_callback(f"▶️ Starting play: {name}\n")
-
-                def v2_playbook_on_task_start(self, task, is_conditional):
-                    name = task.get_name()
-                    self.output_callback(f"⏳ Running task: {name}\n")
-
-            # Create a custom callback to receive events
-            results_callback = ResultCallback(app.ui_updater.add_text_to_output)
-
-            # Import necessary modules
-            from ansible.executor.playbook_executor import PlaybookExecutor
-            from ansible import context
-            from ansible.utils.context_objects import ImmutableDict
-
-            # Set context.CLIARGS which PlaybookExecutor will use internally
-            context.CLIARGS = ImmutableDict(
-                connection="paramiko",  # Use paramiko for SSH connections
-                module_path=None,
-                forks=1,  # Run tasks serially
-                become=None,
-                become_method=None,
-                become_user=None,
-                check=False,  # Don't perform a dry-run
-                syntax=False,  # Don't just check syntax
-                diff=False,  # Don't show file diffs
-                verbosity=0,  # Minimal output
-                listhosts=False,
-                listtasks=False,
-                listtags=False,
-                ssh_common_args="",
-                ssh_extra_args="",
-                sftp_extra_args="",
-                scp_extra_args="",
-                become_ask_pass=False,
-                remote_user=None,
-                host_key_checking=False,  # Disable host key checking
-            )
-
-            app.ui_updater.add_text_to_output("Setting up playbook executor...\n")
-
-            # Create playbook executor without passing options directly
-            pbex = PlaybookExecutor(
-                playbooks=[playbook_file],
-                inventory=inventory,
-                variable_manager=variable_manager,
-                loader=loader,
-                passwords={},
-            )
-
-            # Register our callback if _tqm is available
-            if pbex._tqm is not None:
-                pbex._tqm._stdout_callback = results_callback
-
-            app.ui_updater.add_text_to_output(
-                "Starting playbook execution with Paramiko transport...\n\n"
-            )
-
-            # Run the playbook
-            result = pbex.run()
-
-            if result == 0:
-                app.ui_updater.add_text_to_output(
-                    "\n✨ Playbook execution completed successfully.\n"
-                )
-                app.ui_updater.update_status("Completed")
+            # Create Play from playbook data (use first play)
+            if isinstance(playbook_data, list) and playbook_data:
+                play_data = playbook_data[0]
             else:
-                app.ui_updater.add_text_to_output(
-                    f"\n⚠️ Playbook execution failed with code {result}.\n"
+                play_data = playbook_data
+
+            play = Play().load(play_data, variable_manager=variable_manager, loader=loader)
+            
+            app.ui_updater.add_text_to_output(f"Running play: {play.get_name()}\n")
+
+            # Execute the play
+            tqm = None
+            try:
+                callback = SimpleCallback(app.ui_updater.add_text_to_output)
+                tqm = TaskQueueManager(
+                    inventory=inventory,
+                    variable_manager=variable_manager,
+                    loader=loader,
+                    passwords={},
+                    stdout_callback=callback,
                 )
-                app.ui_updater.update_status("Failed")
+                result = tqm.run(play)
+
+                if result == 0:
+                    app.ui_updater.add_text_to_output("✨ Playbook completed successfully!\n")
+                    app.ui_updater.update_status("Completed")
+                else:
+                    app.ui_updater.add_text_to_output(f"⚠️ Playbook failed with code {result}\n")
+                    app.ui_updater.update_status("Failed")
+
+            finally:
+                if tqm is not None:
+                    tqm.cleanup()
 
         except Exception as error:
-            # Handle any exceptions
-            error_message = str(error)
-            app.ui_updater.add_text_to_output(
-                f"Error executing playbook: {error_message}"
-            )
+            app.ui_updater.add_text_to_output(f"Error: {str(error)}\n")
+            app.ui_updater.add_text_to_output(f"Traceback:\n{traceback.format_exc()}")
             app.ui_updater.update_status("Error")
-            app.ui_updater.add_text_to_output(f"\nTraceback:\n{traceback.format_exc()}")
 
     # Run the task in a background thread
-    app.background_task_runner.run_task(run_in_background, "Running sample playbook...")
+    app.background_task_runner.run_task(run_in_background, "Running playbook...")
