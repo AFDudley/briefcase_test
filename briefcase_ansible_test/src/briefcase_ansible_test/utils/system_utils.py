@@ -174,13 +174,42 @@ def setup_multiprocessing_mock():
     This prevents errors when code tries to use multiprocessing features
     that aren't available on iOS, including the sem_open issue (Python issue 3770).
     """
+    # Create wrapper classes that accept keyword arguments but ignore them
+    class LockWrapper:
+        def __init__(self, *args, **kwargs):
+            self._lock = threading.Lock()
+        def __call__(self, *args, **kwargs):
+            return self._lock
+        def acquire(self, *args, **kwargs):
+            return self._lock.acquire()
+        def release(self):
+            return self._lock.release()
+        def __enter__(self):
+            return self._lock.__enter__()
+        def __exit__(self, *args):
+            return self._lock.__exit__(*args)
+    
+    class RLockWrapper:
+        def __init__(self, *args, **kwargs):
+            self._lock = threading.RLock()
+        def __call__(self, *args, **kwargs):
+            return self._lock
+        def acquire(self, *args, **kwargs):
+            return self._lock.acquire()
+        def release(self):
+            return self._lock.release()
+        def __enter__(self):
+            return self._lock.__enter__()
+        def __exit__(self, *args):
+            return self._lock.__exit__(*args)
+    
     # Mock the _multiprocessing module with all required components
     if "_multiprocessing" not in sys.modules:
         class MultiprocessingModuleType(types.ModuleType):
             def __init__(self):
                 super().__init__("_multiprocessing")
-                # Mock SemLock with threading Lock
-                self.SemLock = threading.Lock
+                # Mock SemLock with our wrapper
+                self.SemLock = LockWrapper
                 # Mock sem_unlink function
                 self.sem_unlink = lambda name: None
                 # Mock Connection
@@ -193,17 +222,69 @@ def setup_multiprocessing_mock():
         class SynchronizeModuleType(types.ModuleType):
             def __init__(self):
                 super().__init__("multiprocessing.synchronize")
-                # Use threading equivalents for all synchronization primitives
-                self.Lock = threading.Lock
-                self.RLock = threading.RLock
-                self.Semaphore = threading.Semaphore
-                self.BoundedSemaphore = threading.BoundedSemaphore
-                self.Event = threading.Event
-                self.Condition = threading.Condition
+                # Use our wrapper classes that accept keyword arguments
+                self.Lock = LockWrapper
+                self.RLock = RLockWrapper
+                self.Semaphore = lambda *args, **kwargs: threading.Semaphore()
+                self.BoundedSemaphore = lambda *args, **kwargs: threading.BoundedSemaphore()
+                self.Event = lambda *args, **kwargs: threading.Event()
+                self.Condition = lambda *args, **kwargs: threading.Condition()
                 # Mock Barrier (not available in all Python versions)
                 if hasattr(threading, 'Barrier'):
-                    self.Barrier = threading.Barrier
+                    self.Barrier = lambda parties, *args, **kwargs: threading.Barrier(parties)
                 else:
-                    self.Barrier = lambda parties: None
+                    self.Barrier = lambda *args, **kwargs: None
         
         sys.modules["multiprocessing.synchronize"] = SynchronizeModuleType()
+    
+    # Mock multiprocessing.queues module
+    if "multiprocessing.queues" not in sys.modules:
+        import queue
+        
+        class SimpleQueueMock:
+            """Mock for multiprocessing.queues.SimpleQueue using threading queue"""
+            def __init__(self, *args, **kwargs):
+                self._queue = queue.SimpleQueue()
+            
+            def put(self, item):
+                return self._queue.put(item)
+            
+            def get(self, block=True, timeout=None):
+                return self._queue.get(block=block, timeout=timeout)
+            
+            def empty(self):
+                return self._queue.empty()
+            
+            def qsize(self):
+                return self._queue.qsize()
+        
+        class QueuesModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__("multiprocessing.queues")
+                self.SimpleQueue = SimpleQueueMock
+                self.Queue = SimpleQueueMock  # Fallback to same implementation
+        
+        sys.modules["multiprocessing.queues"] = QueuesModuleType()
+    
+    # Mock the main multiprocessing module to provide access to submodules
+    if "multiprocessing" not in sys.modules:
+        class MainMultiprocessingModuleType(types.ModuleType):
+            def __init__(self):
+                super().__init__("multiprocessing")
+                # Add other common multiprocessing attributes
+                self.Lock = LockWrapper
+                self.RLock = RLockWrapper
+                self.Queue = SimpleQueueMock
+                self.Process = threading.Thread  # Use Thread as Process mock
+            
+            @property
+            def queues(self):
+                # Lazily access queues submodule to avoid initialization order issues
+                return sys.modules.get("multiprocessing.queues")
+            
+            @property
+            def synchronize(self):
+                # Lazily access synchronize submodule
+                return sys.modules.get("multiprocessing.synchronize")
+        
+        sys.modules["multiprocessing"] = MainMultiprocessingModuleType()
