@@ -111,4 +111,5 @@ setup_ansible_basic_module_mock()
 
 # Import public functions for easier access
 from briefcase_ansible_test.ansible.inventory import parse_ansible_inventory
-from briefcase_ansible_test.ansible.ping import ansible_ping_test_with_key
+from briefcase_ansible_test.ansible.ping import ansible_ping_test_with_key, ansible_ping_test
+from briefcase_ansible_test.ansible.playbook import parse_ansible_playbook, run_ansible_playbook

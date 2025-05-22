@@ -8,6 +8,162 @@ import os
 import threading
 import traceback
 
+# Import Ansible modules
+from ansible.inventory.manager import InventoryManager
+from ansible.parsing.dataloader import DataLoader
+
+
+def ansible_ping_test(app, widget):
+    """
+    Run an Ansible ping module against night2 to verify SSH connectivity.
+    
+    Args:
+        app: The application instance
+        widget: The widget that triggered this function
+    """
+    # Run in a background thread to keep UI responsive
+    def run_in_background():
+        try:
+            # Import Ansible modules
+            from ansible.module_utils.common.collections import ImmutableDict
+            from ansible.inventory.manager import InventoryManager
+            from ansible.vars.manager import VariableManager
+            from ansible.playbook.play import Play
+            from ansible.executor.task_queue_manager import TaskQueueManager
+            from ansible.plugins.callback import CallbackBase
+            from ansible import context
+
+            # Define a custom callback to capture output
+            class ResultCallback(CallbackBase):
+                def __init__(self, output_callback):
+                    super(ResultCallback, self).__init__()
+                    self.output_callback = output_callback
+                    self.host_ok = {}
+                    self.host_failed = {}
+                    self.host_unreachable = {}
+
+                def v2_runner_on_ok(self, result):
+                    host = result._host.get_name()
+                    self.host_ok[host] = result
+                    output = f"{host} | SUCCESS => {{\n"
+                    output += f"    \"changed\": {str(result._result.get('changed', False)).lower()},\n"
+                    if "ansible_facts" in result._result:
+                        output += '    "ansible_facts": {\n'
+                        for k, v in result._result["ansible_facts"].items():
+                            output += (
+                                '        "' + str(k) + '": "' + str(v) + '",\n'
+                            )
+                        output += "    },\n"
+                    output += (
+                        '    "ping": "'
+                        + str(result._result.get("ping", ""))
+                        + '"\n'
+                    )
+                    output += "}\n"
+                    self.output_callback(output)
+
+                def v2_runner_on_failed(self, result, ignore_errors=False):
+                    host = result._host.get_name()
+                    self.host_failed[host] = result
+                    output = f"{host} | FAILED => {{\n"
+                    output += (
+                        '    "msg": "'
+                        + str(result._result.get("msg", "unknown error"))
+                        + '"\n'
+                    )
+                    output += "}\n"
+                    self.output_callback(output)
+
+                def v2_runner_on_unreachable(self, result):
+                    host = result._host.get_name()
+                    self.host_unreachable[host] = result
+                    output = host + " | UNREACHABLE => {\n"
+                    output += (
+                        '    "msg": "'
+                        + str(result._result.get("msg", "unreachable"))
+                        + '"\n'
+                    )
+                    output += "}\n"
+                    self.output_callback(output)
+
+            # Path to the inventory file
+            inventory_file = os.path.join(
+                app.paths.app, "resources", "inventory", "sample_inventory.ini"
+            )
+            app.ui_updater.add_text_to_output(
+                "Using inventory: " + inventory_file + "\n"
+            )
+            app.ui_updater.add_text_to_output("Target: night2\n\n")
+
+            # Setup Ansible objects
+            loader = DataLoader()
+            inventory = InventoryManager(loader=loader, sources=[inventory_file])
+            variable_manager = VariableManager(loader=loader, inventory=inventory)
+
+            # Create and configure options
+            context.CLIARGS = ImmutableDict(
+                connection="ssh",
+                module_path=[],
+                forks=10,
+                become=None,
+                become_method=None,
+                become_user=None,
+                check=False,
+                diff=False,
+                verbosity=0,
+            )
+
+            # Create play with ping task
+            play_source = dict(
+                name="Ansible Ping",
+                hosts="night2",
+                gather_facts=False,
+                tasks=[dict(action=dict(module="ping"))],
+            )
+
+            # Create the Play
+            play = Play().load(
+                play_source, variable_manager=variable_manager, loader=loader
+            )
+
+            # Create callback for output
+            results_callback = ResultCallback(app.ui_updater.add_text_to_output)
+
+            # Run it
+            tqm = None
+            try:
+                tqm = TaskQueueManager(
+                    inventory=inventory,
+                    variable_manager=variable_manager,
+                    loader=loader,
+                    passwords=dict(),
+                    stdout_callback=results_callback,
+                )
+                result = tqm.run(play)
+
+                if result == 0:
+                    app.ui_updater.update_status("Success")
+                else:
+                    app.ui_updater.update_status("Failed")
+
+            finally:
+                if tqm is not None:
+                    tqm.cleanup()
+
+        except Exception as error:
+            app.ui_updater.add_text_to_output(
+                f"Error running Ansible ping: {str(error)}\n"
+            )
+            app.ui_updater.add_text_to_output(
+                f"Traceback: {traceback.format_exc()}\n"
+            )
+            app.ui_updater.update_status("Error")
+
+    # Run the task in a background thread
+    app.background_task_runner.run_task(
+        run_in_background, "Running Ansible ping test..."
+    )
+
 
 def ansible_ping_test_with_key(self, widget):
     """
