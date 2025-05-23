@@ -125,7 +125,7 @@ multiprocessing_utils_module = types.ModuleType("ansible.utils.multiprocessing")
 import multiprocessing
 
 # Use the default context (which is our threading-based one)
-multiprocessing_utils_module.context = multiprocessing
+multiprocessing_utils_module.context = multiprocessing  # type: ignore[attr-defined]
 sys.modules["ansible.utils.multiprocessing"] = multiprocessing_utils_module
 print("iOS_DEBUG: Patched ansible.utils.multiprocessing")
 
@@ -151,6 +151,10 @@ sys.modules["ansible.cli.scripts"] = cli_scripts_module
 setattr(sys.modules["ansible.cli"], "scripts", cli_scripts_module)
 
 print("iOS_DEBUG: Mock ansible.cli.scripts created")
+
+# Set up ansible_collections module hierarchy for iOS
+from .collections_setup import setup_ansible_collections
+setup_ansible_collections()
 
 # Import public functions for easier access
 from briefcase_ansible_test.ansible.inventory import parse_ansible_inventory

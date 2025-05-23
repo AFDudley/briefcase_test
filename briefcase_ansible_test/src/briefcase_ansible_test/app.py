@@ -40,6 +40,8 @@ class BriefcaseAnsibleTest(toga.App):
         from .test_module_level_sim import test_module_level_sim
         from .test_import_trace import test_import_trace
         from .test_ansible_workerprocess import test_ansible_workerprocess
+        from .test_simple_workerprocess import test_simple_workerprocess
+        from .test_ssh_connection import test_ssh_connection
 
         # Define button configurations as tuples: (label, callback, tooltip)
         button_configs = [
@@ -64,7 +66,7 @@ class BriefcaseAnsibleTest(toga.App):
             #     "Run Ansible playbook using Paramiko",
             # ),
             (
-                "Ansible Ping Test",
+                "Local Ansible Ping Test",
                 lambda widget: ansible_ping_test(self, widget),
                 "Run Ansible ping test",
             ),
@@ -91,6 +93,22 @@ class BriefcaseAnsibleTest(toga.App):
                 ),
                 "Test Ansible's actual WorkerProcess in isolation",
             ),
+            (
+                "Simple WorkerProcess Test",
+                lambda widget: self.background_task_runner.run_task(
+                    lambda: test_simple_workerprocess(self.ui_updater),
+                    "Testing Simple WorkerProcess...",
+                ),
+                "Test WorkerProcess with minimal dependencies",
+            ),
+            (
+                "Test SSH Connection",
+                lambda widget: self.background_task_runner.run_task(
+                    lambda: test_ssh_connection(self.ui_updater),
+                    "Testing SSH Connection...",
+                ),
+                "Test direct SSH connection to 127.0.0.1",
+            ),
         ]
 
         # Create action buttons using UIComponents
@@ -110,7 +128,7 @@ class BriefcaseAnsibleTest(toga.App):
 
         # Create main layout with all components
         main_box = UIComponents.create_main_layout(
-            "Ansible Inventory Viewer",
+            "Ansible Test Runner",
             action_buttons,
             self.output_view,
             self.status_label,
