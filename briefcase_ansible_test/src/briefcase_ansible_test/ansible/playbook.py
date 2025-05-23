@@ -75,10 +75,11 @@ def run_ansible_playbook(app, widget):
             # Create data loader and load playbook
             loader = DataLoader()
             playbook_data = loader.load_from_file(playbook_file)
-            
+
             # Set up inventory and variable manager
             inventory = InventoryManager(loader=loader, sources=[inventory_file])
             from ansible.vars.manager import VariableManager
+
             variable_manager = VariableManager(loader=loader, inventory=inventory)
 
             app.ui_updater.add_text_to_output("Setting up Ansible context...\n")
@@ -126,8 +127,10 @@ def run_ansible_playbook(app, widget):
             else:
                 play_data = playbook_data
 
-            play = Play().load(play_data, variable_manager=variable_manager, loader=loader)
-            
+            play = Play().load(
+                play_data, variable_manager=variable_manager, loader=loader
+            )
+
             app.ui_updater.add_text_to_output(f"Running play: {play.get_name()}\n")
 
             # Execute the play
@@ -144,10 +147,14 @@ def run_ansible_playbook(app, widget):
                 result = tqm.run(play)
 
                 if result == 0:
-                    app.ui_updater.add_text_to_output("✨ Playbook completed successfully!\n")
+                    app.ui_updater.add_text_to_output(
+                        "✨ Playbook completed successfully!\n"
+                    )
                     app.ui_updater.update_status("Completed")
                 else:
-                    app.ui_updater.add_text_to_output(f"⚠️ Playbook failed with code {result}\n")
+                    app.ui_updater.add_text_to_output(
+                        f"⚠️ Playbook failed with code {result}\n"
+                    )
                     app.ui_updater.update_status("Failed")
 
             finally:

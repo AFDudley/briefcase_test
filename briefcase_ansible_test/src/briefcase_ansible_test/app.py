@@ -14,7 +14,7 @@ from briefcase_ansible_test.ansible import (
     parse_ansible_inventory,
     parse_ansible_playbook,
     run_ansible_playbook,
-    ansible_ping_test
+    ansible_ping_test,
 )
 from briefcase_ansible_test.ssh_utils import test_ssh_connection
 from briefcase_ansible_test.ui import BackgroundTaskRunner, UIComponents, UIUpdater
@@ -31,32 +31,56 @@ class BriefcaseAnsibleTest(toga.App):
         """Initialize the application."""
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
+        # Import test functions
+        from .test_multiprocessing import test_multiprocessing
+        from .test_worker_import import test_worker_import
+        from .test_display_import import test_display_import
+        from .test_task_executor_imports import test_task_executor_imports
+        from .test_direct_import import test_direct_import
+        from .test_module_level_sim import test_module_level_sim
+        from .test_import_trace import test_import_trace
+
         # Define button configurations as tuples: (label, callback, tooltip)
         button_configs = [
-            (
-                "Parse Inventory",
-                lambda widget: parse_ansible_inventory(self, widget),
-                "Parse Ansible inventory files",
-            ),
-            (
-                "Parse Playbook",
-                lambda widget: parse_ansible_playbook(self, widget),
-                "Parse Ansible playbook files",
-            ),
-            (
-                "Test Paramiko",
-                self.test_paramiko_connection,
-                "Test SSH connection using Paramiko",
-            ),
-            (
-                "Run Playbook (Paramiko)",
-                lambda widget: run_ansible_playbook(self, widget),
-                "Run Ansible playbook using Paramiko",
-            ),
+            # (
+            #     "Parse Inventory",
+            #     lambda widget: parse_ansible_inventory(self, widget),
+            #     "Parse Ansible inventory files",
+            # ),
+            # (
+            #     "Parse Playbook",
+            #     lambda widget: parse_ansible_playbook(self, widget),
+            #     "Parse Ansible playbook files",
+            # ),
+            # (
+            #     "Test Paramiko",
+            #     self.test_paramiko_connection,
+            #     "Test SSH connection using Paramiko",
+            # ),
+            # (
+            #     "Run Playbook (Paramiko)",
+            #     lambda widget: run_ansible_playbook(self, widget),
+            #     "Run Ansible playbook using Paramiko",
+            # ),
             (
                 "Ansible Ping Test",
                 lambda widget: ansible_ping_test(self, widget),
-                "Run Ansible ping test"
+                "Run Ansible ping test",
+            ),
+            (
+                "Test Import Trace",
+                lambda widget: self.background_task_runner.run_task(
+                    lambda: test_import_trace(self.ui_updater), "Tracing imports..."
+                ),
+                "Trace imports to find circular dependencies",
+            ),
+            (
+                "Test Module Level Sim",
+                lambda widget: self.background_task_runner.run_task(
+                    lambda: test_module_level_sim(self.ui_updater),
+                    "Testing module level simulation...",
+                ),
+                "Simulate task_executor module-level code",
             ),
         ]
 

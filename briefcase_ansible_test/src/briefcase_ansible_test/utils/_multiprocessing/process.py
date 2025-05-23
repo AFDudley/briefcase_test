@@ -72,6 +72,9 @@ class ThreadProcess(BaseProcess):
         # Termination support
         self._terminate_event = threading.Event()
 
+        # Sentinel for process completion (multiprocessing compatibility)
+        self._sentinel = threading.Event()
+
     @property
     def name(self) -> str:
         """Get the process name."""
@@ -118,6 +121,11 @@ class ThreadProcess(BaseProcess):
             return None
         return self._exitcode
 
+    @property
+    def sentinel(self):
+        """Get sentinel object for process completion."""
+        return self._sentinel
+
     def is_alive(self) -> bool:
         """Check if the process is currently running."""
         if not self._started or self._thread is None:
@@ -126,18 +134,31 @@ class ThreadProcess(BaseProcess):
 
     def start(self):
         """Start the process execution."""
-        if self._started:
-            raise RuntimeError("process has already started")
+        try:
+            if self._started:
+                raise RuntimeError("process has already started")
 
-        self._started = True
-        self._pid = threading.get_ident()  # Use thread ID as PID
+            self._started = True
+            self._pid = threading.get_ident()  # Use thread ID as PID
 
-        # Create and configure the thread
-        self._thread = threading.Thread(
-            target=self._run_wrapper, name=self._name, daemon=self._daemon
-        )
+            print(f"iOS_DEBUG: ThreadProcess.start() called for {self._name}")
+            print(f"iOS_DEBUG: Target function: {self._target}")
+            print(f"iOS_DEBUG: Daemon: {self._daemon}")
+            print(f"iOS_DEBUG: Class: {self.__class__.__name__}")
 
-        self._thread.start()
+            # Create and configure the thread
+            self._thread = threading.Thread(
+                target=self._run_wrapper, name=self._name, daemon=self._daemon
+            )
+
+            self._thread.start()
+            print(f"iOS_DEBUG: Thread {self._name} started successfully")
+        except Exception as e:
+            print(f"iOS_DEBUG: EXCEPTION in ThreadProcess.start(): {e}")
+            import traceback
+
+            print(f"iOS_DEBUG: Traceback: {traceback.format_exc()}")
+            raise
 
     def join(self, timeout=None):
         """
@@ -198,6 +219,23 @@ class ThreadProcess(BaseProcess):
         """
         Internal wrapper that executes the target function and handles exceptions.
         """
+        print(
+            f"iOS_DEBUG: _run_wrapper started for thread {threading.current_thread().name}"
+        )
+
+        # Override os._exit to prevent iOS crashes
+        original_exit = None
+        if hasattr(os, "_exit"):
+            original_exit = os._exit
+
+            def mock_exit(code):
+                print(f"iOS_DEBUG: os._exit({code}) called - converting to thread exit")
+                self._exitcode = code
+                # Raise SystemExit to stop the thread cleanly
+                raise SystemExit(code)
+
+            os._exit = mock_exit
+
         try:
             # Check for termination request before starting
             if self._terminate_event.is_set():
@@ -207,15 +245,35 @@ class ThreadProcess(BaseProcess):
             # Execute the target function or overridden run method
             if self._target is not None:
                 # Standard usage: Process(target=function, args=...)
+                print(
+                    f"iOS_DEBUG: Calling target function {self._target.__name__ if hasattr(self._target, '__name__') else self._target}"
+                )
                 result = self._target(*self._args, **self._kwargs)
             else:
                 # Subclass usage: class MyProcess(Process): def run(self): ...
                 # This is how Ansible's WorkerProcess works
-                result = self.run()
+                print(f"iOS_DEBUG: Calling run() method on {self.__class__.__name__}")
+
+                # Wrap run() to catch exceptions
+                try:
+                    result = self.run()
+                except Exception as run_exc:
+                    print(f"iOS_DEBUG: Exception in run() method: {run_exc}")
+                    print(f"iOS_DEBUG: Exception type: {type(run_exc)}")
+                    import traceback
+
+                    print(f"iOS_DEBUG: Traceback:\n{traceback.format_exc()}")
+                    raise
 
             # Store result if successful
             self._result_queue.put(result)
             self._exitcode = 0
+            print(f"iOS_DEBUG: Thread completed successfully with result: {result}")
+
+        except SystemExit as e:
+            # Handle clean thread exit from mock os._exit
+            self._exitcode = e.code if hasattr(e, "code") else 0
+            print(f"iOS_DEBUG: Thread exiting with code {self._exitcode}")
 
         except Exception as e:
             # Capture exception with full traceback
@@ -232,6 +290,14 @@ class ThreadProcess(BaseProcess):
         except BaseException as e:
             # Handle system exit and other base exceptions
             self._exitcode = getattr(e, "code", 1)
+
+        finally:
+            # Restore original os._exit if we replaced it
+            if original_exit and hasattr(os, "_exit"):
+                os._exit = original_exit
+
+            # Set sentinel to indicate process completion
+            self._sentinel.set()
 
     def _check_for_exceptions(self):
         """Check if any exceptions occurred and re-raise them."""

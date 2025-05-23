@@ -26,6 +26,7 @@ See multiprocessing_ios_analysis.md for detailed architecture and implementation
 
 import sys
 import os
+import threading
 
 # Import all components
 from .context import (
@@ -36,7 +37,7 @@ from .context import (
     get_all_start_methods,
 )
 from .process import ThreadProcess, BaseProcess
-from .queues import ProcessQueue, ProcessSimpleQueue, JoinableQueue
+from .queues import ProcessQueue, ProcessSimpleQueue, JoinableQueue, BaseQueue
 from .synchronize import (
     ThreadLock,
     ThreadRLock,
@@ -56,6 +57,9 @@ Queue = ProcessQueue
 SimpleQueue = ProcessSimpleQueue
 JoinableQueue = JoinableQueue
 
+# Make our default context available as 'context'
+context = _default_context
+
 # Synchronization primitives
 Lock = ThreadLock
 RLock = ThreadRLock
@@ -65,10 +69,29 @@ Event = ThreadEvent
 Condition = ThreadCondition
 Barrier = ThreadBarrier
 
-# Context management
-current_process = lambda: _FakeProcess()
-active_children = lambda: []
-cpu_count = lambda: 1  # iOS typically single-core for Python
+# Keep track of parent process for worker threads
+_parent_process = None
+
+
+def parent_process():
+    """
+    Get the parent process of the current process.
+
+    Returns:
+        None if this is the main process
+        Process object if this is a child process
+    """
+    import threading
+
+    # Check if we're in a worker thread (ThreadProcess)
+    current_thread = threading.current_thread()
+    if hasattr(current_thread, "_target") and current_thread.name.startswith(
+        "ThreadProcess"
+    ):
+        # This is a worker thread, return the main process
+        return _main_process
+    # This is the main thread
+    return None
 
 
 class _FakeProcess:
@@ -76,13 +99,38 @@ class _FakeProcess:
     Fake process object for current_process() compatibility.
     """
 
-    def __init__(self):
-        self.name = "MainThread"
+    def __init__(self, name="MainProcess"):
+        self.name = name
         self.pid = os.getpid() if hasattr(os, "getpid") else 1
         self.daemon = False
+        self.ident = threading.get_ident() if hasattr(threading, "get_ident") else 1
 
     def is_alive(self):
         return True
+
+
+# Create a singleton main process
+_main_process = _FakeProcess("MainProcess")
+
+
+# Context management functions
+def current_process():
+    """Get the current process."""
+    import threading
+
+    current_thread = threading.current_thread()
+    if hasattr(current_thread, "_target") and current_thread.name.startswith(
+        "ThreadProcess"
+    ):
+        # Return a process-like object for the thread
+        proc = _FakeProcess(current_thread.name)
+        proc.ident = current_thread.ident
+        return proc
+    return _main_process
+
+
+active_children = lambda: []
+cpu_count = lambda: 1  # iOS typically single-core for Python
 
 
 # Pool implementation for basic compatibility
@@ -230,6 +278,7 @@ __all__ = [
     "Process",
     "current_process",
     "active_children",
+    "parent_process",
     # Queues
     "Queue",
     "SimpleQueue",
@@ -292,7 +341,9 @@ def _patch_system_modules():
     queues_module.Queue = Queue  # type: ignore
     queues_module.SimpleQueue = SimpleQueue  # type: ignore
     queues_module.JoinableQueue = JoinableQueue  # type: ignore
+    queues_module.BaseQueue = BaseQueue  # type: ignore
     sys.modules["multiprocessing.queues"] = queues_module  # type: ignore
+    print("iOS_DEBUG: multiprocessing.queues patched")
 
     # Synchronize module - minimal exports
     sync_module = type("Module", (), {})()
@@ -319,3 +370,9 @@ def _patch_system_modules():
 
 # Auto-patch on import
 _patch_system_modules()
+
+# Public alias for external use
+patch_system_modules = _patch_system_modules
+
+print("iOS_DEBUG: _multiprocessing module loaded, Process class available")
+print(f"iOS_DEBUG: multiprocessing.Process is now: {Process}")

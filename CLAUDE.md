@@ -100,3 +100,31 @@ briefcase package -p macOS
 - Run Ansible playbooks via Paramiko
 - Perform Ansible ping tests against hosts
 - Thread management for responsive UI on iOS
+
+## iOS-Specific Debugging Information
+
+### Known Working Configuration
+The Ansible ping test works correctly in pure Python (macOS) with:
+- Host configuration: `[localhost]` group containing `127.0.0.1 ansible_connection=local`
+- Play definition: `hosts: localhost`, single ping task
+- This configuration is **NOT** the issue on iOS - it works fine on macOS
+
+### Current iOS Issue (as of last debugging session)
+- The custom multiprocessing module (`utils._multiprocessing`) loads correctly
+- Ansible's TaskQueueManager runs but completes immediately with no task execution
+- No WorkerProcess instances are created despite multiprocessing.Process being properly patched
+- The issue appears to be that Ansible's strategy plugin is not iterating through hosts/tasks
+- Debug output shows:
+  - Play loads successfully
+  - Inventory hosts are found correctly
+  - Callback is created on the correct thread
+  - TQM.run() completes with result: None
+  - 0 successful/failed/unreachable hosts
+
+### iOS Debug Messages
+Add `print(f"iOS_DEBUG: ...")` statements to trace execution in iOS simulator logs.
+Current debug points:
+- `_multiprocessing` module loading
+- `ThreadProcess.start()` and `_run_wrapper()` methods
+- TQM.run() entry and exit
+- multiprocessing.Process verification before TQM execution

@@ -14,6 +14,7 @@ from briefcase_ansible_test.utils.system_utils import (
     patch_getpass,
     setup_pwd_module_mock,
     setup_grp_module_mock,
+    setup_subprocess_mock,
     setup_multiprocessing_mock,
 )
 
@@ -107,11 +108,54 @@ def setup_ansible_basic_module_mock():
 patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
+setup_subprocess_mock()
 setup_multiprocessing_mock()
 setup_ansible_text_module_mock()
 setup_ansible_basic_module_mock()
 
+# Patch ansible.utils.multiprocessing to use our context
+# This must be done before any Ansible imports that use it
+# First ensure ansible.utils exists
+if "ansible.utils" not in sys.modules:
+    import ansible.utils
+
+# Create the multiprocessing submodule
+multiprocessing_utils_module = types.ModuleType("ansible.utils.multiprocessing")
+# Import our multiprocessing to get the context
+import multiprocessing
+
+# Use the default context (which is our threading-based one)
+multiprocessing_utils_module.context = multiprocessing
+sys.modules["ansible.utils.multiprocessing"] = multiprocessing_utils_module
+print("iOS_DEBUG: Patched ansible.utils.multiprocessing")
+
+# Mock ansible.cli.scripts to prevent hanging on iOS
+# This is needed because task_executor imports it to find CLI stub scripts
+print("iOS_DEBUG: Creating mock for ansible.cli.scripts")
+
+# Import ansible first
+import ansible
+
+# Create parent modules if needed
+if "ansible.cli" not in sys.modules:
+    cli_module = types.ModuleType("ansible.cli")
+    cli_module.__path__ = ["/mock/ansible/cli"]
+    sys.modules["ansible.cli"] = cli_module
+    setattr(ansible, "cli", cli_module)
+
+# Create the scripts module
+cli_scripts_module = types.ModuleType("ansible.cli.scripts")
+cli_scripts_module.__file__ = "/mock/ansible/cli/scripts/__init__.py"
+cli_scripts_module.__path__ = ["/mock/ansible/cli/scripts"]
+sys.modules["ansible.cli.scripts"] = cli_scripts_module
+setattr(sys.modules["ansible.cli"], "scripts", cli_scripts_module)
+
+print("iOS_DEBUG: Mock ansible.cli.scripts created")
+
 # Import public functions for easier access
 from briefcase_ansible_test.ansible.inventory import parse_ansible_inventory
 from briefcase_ansible_test.ansible.ping import ansible_ping_test
-from briefcase_ansible_test.ansible.playbook import parse_ansible_playbook, run_ansible_playbook
+from briefcase_ansible_test.ansible.playbook import (
+    parse_ansible_playbook,
+    run_ansible_playbook,
+)

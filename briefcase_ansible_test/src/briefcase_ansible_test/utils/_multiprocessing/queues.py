@@ -14,7 +14,13 @@ import traceback
 from typing import Any, Optional, Union
 
 
-class ProcessQueue:
+class BaseQueue:
+    """Base queue class to support proper inheritance."""
+
+    pass
+
+
+class ProcessQueue(BaseQueue):
     """
     Thread-based replacement for multiprocessing.Queue.
 
@@ -338,3 +344,13 @@ class JoinableQueue(ProcessQueue):
 # Aliases for compatibility
 Queue = ProcessQueue
 SimpleQueue = ProcessSimpleQueue
+
+# Export base class for inheritance support
+__all__ = [
+    "ProcessQueue",
+    "ProcessSimpleQueue",
+    "JoinableQueue",
+    "Queue",
+    "SimpleQueue",
+    "BaseQueue",
+]
