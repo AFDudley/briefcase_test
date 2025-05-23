@@ -27,7 +27,7 @@ def setup_multiprocessing_mock():
     threading-based implementation that works without fork() or sem_open().
     """
     # Import our threading-based multiprocessing implementation
-    from briefcase_ansible_test.utils._multiprocessing import patch_system_modules
+    from briefcase_ansible_test.utils.multiprocessing import patch_system_modules
 
     # Apply the patch to replace multiprocessing with our implementation
     patch_system_modules()

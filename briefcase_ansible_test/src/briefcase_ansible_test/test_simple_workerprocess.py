@@ -15,7 +15,7 @@ def test_simple_workerprocess(ui_updater):
     ui_updater.add_text_to_output("Setting up iOS patches...\n")
     
     # Apply all iOS compatibility patches
-    from briefcase_ansible_test.utils._multiprocessing import _patch_system_modules
+    from briefcase_ansible_test.utils.multiprocessing import _patch_system_modules
     from briefcase_ansible_test.utils import (
         setup_pwd_module_mock,
         setup_grp_module_mock,
@@ -41,7 +41,7 @@ def test_simple_workerprocess(ui_updater):
         ui_updater.add_text_to_output("✅ WorkerProcess imported successfully\n")
         
         # Import our queue
-        from briefcase_ansible_test.utils._multiprocessing.queues import ProcessQueue
+        from briefcase_ansible_test.utils.multiprocessing.queues import ProcessQueue
         
         # Create a minimal task-like object
         class FakeTask:
