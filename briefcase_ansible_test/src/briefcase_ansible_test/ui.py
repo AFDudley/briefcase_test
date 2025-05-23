@@ -160,6 +160,8 @@ class BackgroundTaskRunner:
             try:
                 # Execute the actual task
                 task_func()
+                # Task completed successfully - clear the status
+                self.ui_updater.update_status("Ready")
             except Exception as error:
                 # Handle any exceptions
                 error_message = str(error)
