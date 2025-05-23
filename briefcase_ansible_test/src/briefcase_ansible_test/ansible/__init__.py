@@ -10,13 +10,13 @@ import os
 import stat
 
 # Ensure system mocks are set up before importing anything else
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     patch_getpass,
     setup_pwd_module_mock,
     setup_grp_module_mock,
     setup_subprocess_mock,
-    setup_multiprocessing_mock,
 )
+from briefcase_ansible_test.utils.ios_patches import setup_multiprocessing_mock
 
 # Import SSH utilities for Paramiko patching
 from briefcase_ansible_test.ssh_utils import patch_paramiko_for_async

@@ -39,6 +39,7 @@ class BriefcaseAnsibleTest(toga.App):
         from .test_direct_import import test_direct_import
         from .test_module_level_sim import test_module_level_sim
         from .test_import_trace import test_import_trace
+        from .test_ansible_workerprocess import test_ansible_workerprocess
 
         # Define button configurations as tuples: (label, callback, tooltip)
         button_configs = [
@@ -81,6 +82,14 @@ class BriefcaseAnsibleTest(toga.App):
                     "Testing module level simulation...",
                 ),
                 "Simulate task_executor module-level code",
+            ),
+            (
+                "Test WorkerProcess",
+                lambda widget: self.background_task_runner.run_task(
+                    lambda: test_ansible_workerprocess(self.ui_updater),
+                    "Testing Ansible WorkerProcess...",
+                ),
+                "Test Ansible's actual WorkerProcess in isolation",
             ),
         ]
 
