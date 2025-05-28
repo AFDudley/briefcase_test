@@ -72,15 +72,15 @@ def import_paramiko():
     return paramiko
 
 
-def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=None):
+def test_ssh_connection(hostname="night2.lan", username="mtm", port=22, key_path=None, ui_updater=None):
     """
     Test an SSH connection using Paramiko with an ED25519 key.
 
     Args:
-        hostname: The hostname to connect to
-        username: The username to authenticate as
+        hostname: The hostname to connect to (default: "night2.lan")
+        username: The username to authenticate as (default: "mtm")
         port: The port to connect to (default: 22)
-        key_path: Path to private key file (default: will look in resources/keys)
+        key_path: Path to private key file (default: looks for briefcase_test_key in resources/keys)
         ui_updater: UI updater for showing progress (optional)
 
     Returns:
@@ -104,14 +104,24 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        # key_path must be provided by caller
+        # Use default key path if none provided
+        if not key_path:
+            # Try to find the app directory and default key
+            try:
+                import briefcase_ansible_test
+                import inspect
+                app_module_path = inspect.getfile(briefcase_ansible_test)
+                app_dir = os.path.dirname(app_module_path)
+                key_path = os.path.join(app_dir, "resources", "keys", "briefcase_test_key")
+                if ui_updater:
+                    ui_updater.add_text_to_output(f"Using default key path: {key_path}\n")
+            except Exception as e:
+                if ui_updater:
+                    ui_updater.add_text_to_output(f"❌ Could not determine default key path: {e}\n")
+                return False
 
         # Check if key exists
         key = None
-        if not key_path:
-            if ui_updater:
-                ui_updater.add_text_to_output("❌ No key path provided\n")
-            return False
 
         if os.path.exists(key_path):
             if ui_updater:
@@ -175,28 +185,17 @@ def test_ssh_connection(hostname, username, port=22, key_path=None, ui_updater=N
             ui_updater.update_status("Connected")
         return True
 
-    except paramiko.AuthenticationException:
+    except paramiko.AuthenticationException as e:
         if ui_updater:
-            ui_updater.add_text_to_output(
-                "Authentication failed but socket connection works!\n"
-            )
-            ui_updater.add_text_to_output("✅ Paramiko is working correctly.\n")
+            ui_updater.add_text_to_output(f"❌ Authentication failed: {str(e)}\n")
+            ui_updater.add_text_to_output("💡 Check that the public key is added to ~/.ssh/authorized_keys on the server\n")
             ui_updater.update_status("Auth Failed")
-        # Still consider this a success for testing purposes
-        return True
+        return False
 
     except paramiko.SSHException as e:
         if ui_updater:
-            ui_updater.add_text_to_output(f"SSH error: {str(e)}\n")
-            if "banner exchange" in str(e).lower():
-                ui_updater.add_text_to_output(
-                    "✅ Banner exchange attempted! Paramiko is working.\n"
-                )
-                ui_updater.update_status("Partial Success")
-                return True
-            else:
-                ui_updater.add_text_to_output("❌ SSH negotiation failed\n")
-                ui_updater.update_status("Failed")
+            ui_updater.add_text_to_output(f"❌ SSH error: {str(e)}\n")
+            ui_updater.update_status("SSH Failed")
         return False
 
     except Exception as e:
@@ -251,8 +250,8 @@ def generate_ed25519_key(app_path, ui_updater=None):
         # Get the public key (used to create the public key file)
         private_key.public_key()
 
-        # Serialize the private key to PEM format
-        private_key_pem = private_key.private_bytes(
+        # Serialize the private key to OpenSSH format for file storage
+        private_key_openssh = private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.OpenSSH,
             encryption_algorithm=serialization.NoEncryption(),
@@ -261,14 +260,14 @@ def generate_ed25519_key(app_path, ui_updater=None):
         # Save the private key
         private_key_path = os.path.join(ssh_dir, "id_ed25519")
         with open(private_key_path, "wb") as f:
-            f.write(private_key_pem)
+            f.write(private_key_openssh)
 
         # Make sure permissions are set correctly (600)
         os.chmod(private_key_path, 0o600)
 
         # Create the public key in OpenSSH format
-        # We'll use paramiko to help with this
-        pk = paramiko.Ed25519Key(data=private_key_pem)
+        # Use paramiko to load the key and get the proper format
+        pk = paramiko.Ed25519Key.from_private_key_file(private_key_path)
         public_key_str = f"{pk.get_name()} {pk.get_base64()} ansible-briefcase-app"
 
         # Save the public key
@@ -309,9 +308,40 @@ def generate_ed25519_key(app_path, ui_updater=None):
             ui_updater.update_status("Failed")
         return False, None, None, None
 
+
+def test_ssh_connection_with_generated_key(app_paths, ui_updater):
+    """Test SSH connection using generated ed25519 key"""
+    try:
+        ui_updater.add_text_to_output("Testing SSH Connection with generated key...\n")
+        
+        # Check if generated key exists
+        ssh_dir = os.path.join(app_paths.app, "resources", "ssh")
+        private_key_path = os.path.join(ssh_dir, "id_ed25519")
+        public_key_path = os.path.join(ssh_dir, "id_ed25519.pub")
+        
+        if not os.path.exists(private_key_path):
+            ui_updater.add_text_to_output("❌ No generated key found. Please generate a key first using 'Generate ED25519 Key' button.\n")
+            return
+        
+        # Display the public key
+        try:
+            with open(public_key_path, 'r') as f:
+                public_key_str = f.read().strip()
+            ui_updater.add_text_to_output(f"📋 Using generated ed25519 public key:\n{public_key_str}\n")
+            ui_updater.add_text_to_output("💡 Make sure this key is added to ~/.ssh/authorized_keys for user 'mtm' on night2.lan\n")
+        except Exception as e:
+            ui_updater.add_text_to_output(f"⚠ Could not read public key: {e}\n")
+        
+        # Test SSH connection using the existing test_ssh_connection function
+        ui_updater.add_text_to_output("🔧 Testing SSH connection with generated key...\n")
+        success = test_ssh_connection("night2.lan", "mtm", key_path=private_key_path, ui_updater=ui_updater)
+        
+        if success:
+            ui_updater.add_text_to_output("✅ Generated key SSH connection test complete.\n")
+        else:
+            ui_updater.add_text_to_output("❌ Generated key SSH connection test failed.\n")
+        
     except Exception as e:
-        if ui_updater:
-            ui_updater.add_text_to_output(f"Error generating key: {str(e)}\n")
-            ui_updater.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
-            ui_updater.update_status("Error")
-        return False, None, None, None
+        ui_updater.add_text_to_output(f"❌ Generated key SSH connection failed: {e}\n")
+        import traceback
+        ui_updater.add_text_to_output(f"Traceback:\n{traceback.format_exc()}\n")
