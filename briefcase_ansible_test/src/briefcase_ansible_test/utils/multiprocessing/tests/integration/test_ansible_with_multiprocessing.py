@@ -18,7 +18,7 @@ from briefcase_ansible_test.utils.multiprocessing import _patch_system_modules
 _patch_system_modules()
 
 # Now import system utils and apply patches
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     setup_pwd_module_mock,
     setup_grp_module_mock,
     patch_getpass,
@@ -164,10 +164,8 @@ def test_multiprocessing_modules():
     print(f"multiprocessing.synchronize: {multiprocessing.synchronize}")
 
     # Verify it's our implementation
-    if (
-        hasattr(multiprocessing, "__version__")
-        and "ios-threading" in multiprocessing.__version__
-    ):
+    version = getattr(multiprocessing, "__version__", "")
+    if version and "ios-threading" in version:
         print("✓ Using iOS threading-based multiprocessing implementation")
         return True
     else:

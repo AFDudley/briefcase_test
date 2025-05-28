@@ -71,7 +71,7 @@ from briefcase_ansible_test.utils.multiprocessing import _patch_system_modules
 
 _patch_system_modules()
 
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     setup_pwd_module_mock,
     setup_grp_module_mock,
     patch_getpass,
@@ -87,13 +87,13 @@ try:
     print("Creating WorkerProcess to test inheritance...")
 
     # Create a minimal WorkerProcess instance
-    wp = WorkerProcess(None, None, None, None, None, None, None, None)
+    wp = WorkerProcess(None, None, None, None, None, None, None, None, 1)
     print(f"WorkerProcess created: {wp}")
     print(f"WorkerProcess has run method: {hasattr(wp, 'run')}")
     print(f"WorkerProcess.run is callable: {callable(getattr(wp, 'run', None))}")
 
     # Test that our ThreadProcess recognizes the overridden run method
-    print(f"ThreadProcess._target is None: {wp._target is None}")
+    print(f"ThreadProcess._target is None: {getattr(wp, '_target', 'not found') is None}")
     print("✅ Ansible WorkerProcess pattern test completed!")
 
 except Exception as e:

@@ -24,13 +24,15 @@ test_sources = [
 requires = [
     # Core dependencies
     "--find-links", "/Users/rix/code/mobile-forge/dist",
+    "--find-links", "/Users/rix/code/ios-multiprocessing/dist",
     "PyYAML",
     "MarkupSafe",
     "bcrypt==3.1.7",
     "PyNaCl==1.5.0",
     "paramiko==2.2.1",
     "ansible-core>=2.15.0",
-    "ansible-runner>=2.3.1"
+    "ansible-runner>=2.3.1",
+    "ios-multiprocessing"
 ]
 test_requires = [
     "pytest",

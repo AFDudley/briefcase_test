@@ -12,7 +12,7 @@ from briefcase_ansible_test.utils.multiprocessing import _patch_system_modules
 
 _patch_system_modules()
 
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     setup_pwd_module_mock,
     setup_grp_module_mock,
     patch_getpass,

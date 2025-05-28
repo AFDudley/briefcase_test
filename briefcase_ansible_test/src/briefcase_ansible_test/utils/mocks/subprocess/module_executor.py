@@ -17,10 +17,10 @@ def execute_ansible_module(module_path):
 
     This provides a real execution of Ansible modules on iOS by running
     them directly in our Python environment instead of spawning subprocesses.
-    
+
     Args:
         module_path: Path to the Ansible module to execute
-        
+
     Returns:
         str: JSON output from the module
     """
@@ -119,9 +119,7 @@ def execute_ansible_module(module_path):
             f"iOS_DEBUG: Module stdout: {repr(result_json[:500])}\n"
         )  # First 500 chars
         if error_output:
-            old_stdout.write(
-                f"iOS_DEBUG: Module stderr: {repr(error_output[:500])}\n"
-            )
+            old_stdout.write(f"iOS_DEBUG: Module stderr: {repr(error_output[:500])}\n")
         old_stdout.flush()
 
         # If we got JSON output, return it

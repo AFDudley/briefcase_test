@@ -301,6 +301,8 @@ __all__ = [
     "pool",
     # Utility
     "cpu_count",
+    # iOS-specific
+    "patch_system_modules",
 ]
 
 # Create pool submodule for import compatibility

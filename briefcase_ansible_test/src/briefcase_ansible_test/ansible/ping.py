@@ -24,11 +24,6 @@ from .ansible_config import (
     setup_ansible_inventory,
 )
 from .play_executor import create_play, load_play, execute_play_with_timeout
-from .debug_patches import (
-    apply_worker_debug_patches,
-    apply_connection_debug_patches,
-    verify_ping_module,
-)
 
 
 def ansible_ping_test(app, widget):
@@ -44,8 +39,10 @@ def ansible_ping_test(app, widget):
     def run_in_background():
         try:
             # Target host configuration - use the group name to match inventory
-            target_host = "localhost"  # This matches the [localhost] group containing 127.0.0.1
-            
+            target_host = (
+                "localhost"  # This matches the [localhost] group containing 127.0.0.1
+            )
+
             # Get path to the SSH key
             key_path = os.path.join(
                 app.paths.app, "resources", "keys", "briefcase_test_key"
@@ -56,13 +53,13 @@ def ansible_ping_test(app, widget):
                 app.paths.app, "resources", "inventory", "sample_inventory.ini"
             )
 
-            app.ui_updater.add_text_to_output(
-                f"📁 Using inventory: {inventory_path}\n"
-            )
+            app.ui_updater.add_text_to_output(f"📁 Using inventory: {inventory_path}\n")
 
             # Setup Ansible objects
             loader = DataLoader()
-            inventory, variable_manager = setup_ansible_inventory(inventory_path, loader)
+            inventory, variable_manager = setup_ansible_inventory(
+                inventory_path, loader
+            )
 
             # Debug inventory contents
             debug_inventory_contents(
@@ -78,37 +75,38 @@ def ansible_ping_test(app, widget):
             # Initialize plugin loader
             initialize_plugin_loader(app.ui_updater.add_text_to_output)
 
-            # Apply debug patches
-            apply_worker_debug_patches(app.ui_updater.add_text_to_output)
-            apply_connection_debug_patches(app.ui_updater.add_text_to_output)
-
-            # Verify ping module
-            verify_ping_module(app.ui_updater.add_text_to_output)
-
             # Check directory access and set up temp directory
             app.ui_updater.add_text_to_output("Checking directory access...\n")
             home_dir = os.path.expanduser("~")
             app.ui_updater.add_text_to_output(f"Home directory: {home_dir}\n")
-            
+
             writable_dir, test_results = find_writable_directory(app)
-            
+
             # Display test results
             for test_dir, success, error in test_results:
                 if success:
-                    app.ui_updater.add_text_to_output(f"✅ Write access to: {test_dir}\n")
+                    app.ui_updater.add_text_to_output(
+                        f"✅ Write access to: {test_dir}\n"
+                    )
                 else:
-                    app.ui_updater.add_text_to_output(f"❌ No write access to {test_dir}: {error}\n")
-            
+                    app.ui_updater.add_text_to_output(
+                        f"❌ No write access to {test_dir}: {error}\n"
+                    )
+
             # Set up Ansible temp directory
             if writable_dir:
-                setup_ansible_temp_directory(writable_dir, app.ui_updater.add_text_to_output)
+                setup_ansible_temp_directory(
+                    writable_dir, app.ui_updater.add_text_to_output
+                )
             else:
                 app.ui_updater.add_text_to_output("❌ No writable directory found!\n")
 
             # Create play
             play_source = create_play(target_host)
-            play = load_play(play_source, variable_manager, loader, app.ui_updater.add_text_to_output)
-            
+            play = load_play(
+                play_source, variable_manager, loader, app.ui_updater.add_text_to_output
+            )
+
             if not play:
                 return
 
@@ -157,9 +155,13 @@ def ansible_ping_test(app, widget):
                     )
 
                 if result == 0:
-                    app.ui_updater.add_text_to_output("✅ Ansible ping test completed successfully!\n")
+                    app.ui_updater.add_text_to_output(
+                        "✅ Ansible ping test completed successfully!\n"
+                    )
                 else:
-                    app.ui_updater.add_text_to_output(f"❌ Ansible ping test failed with result: {result}\n")
+                    app.ui_updater.add_text_to_output(
+                        f"❌ Ansible ping test failed with result: {result}\n"
+                    )
 
             finally:
                 if tqm is not None:
@@ -167,7 +169,9 @@ def ansible_ping_test(app, widget):
                     app.ui_updater.add_text_to_output("🧹 Cleanup completed\n")
 
         except Exception as e:
-            app.ui_updater.add_text_to_output(f"❌ Error during Ansible ping test: {e}\n")
+            app.ui_updater.add_text_to_output(
+                f"❌ Error during Ansible ping test: {e}\n"
+            )
             app.ui_updater.add_text_to_output(f"Traceback: {traceback.format_exc()}\n")
 
     # Run the task in a background thread

@@ -13,7 +13,7 @@ from ansible import constants as C
 def check_multiprocessing_availability(output_callback):
     """
     Check availability of multiprocessing modules.
-    
+
     Args:
         output_callback: Function to call with output messages
     """
@@ -25,10 +25,13 @@ def check_multiprocessing_availability(output_callback):
     for module_name in multiprocessing_modules:
         try:
             import importlib
+
             module = importlib.import_module(module_name)
             output_callback(f"✅ {module_name} is available\n")
             if module_name == "multiprocessing":
-                output_callback(f"   Process class: {getattr(module, 'Process', 'Not found')}\n")
+                output_callback(
+                    f"   Process class: {getattr(module, 'Process', 'Not found')}\n"
+                )
         except ImportError as e:
             output_callback(f"❌ {module_name} not available: {e}\n")
 
@@ -36,16 +39,16 @@ def check_multiprocessing_availability(output_callback):
 def find_writable_directory(app):
     """
     Find a writable directory for Ansible operations.
-    
+
     Args:
         app: The application instance
-        
+
     Returns:
         tuple: (writable_dir, test_results) where test_results is a list of (dir, success, error) tuples
     """
     test_results = []
     home_dir = os.path.expanduser("~")
-    
+
     # Test write access to different directories
     test_dirs = [
         home_dir,
@@ -79,35 +82,37 @@ def find_writable_directory(app):
                 writable_dir = test_dir
         except Exception as e:
             test_results.append((test_dir, False, str(e)))
-            
+
     return writable_dir, test_results
 
 
 def setup_ansible_temp_directory(writable_dir, output_callback):
     """
     Set up Ansible temporary directory in a writable location.
-    
+
     Args:
         writable_dir: Path to a writable directory
         output_callback: Function to call with output messages
-        
+
     Returns:
         bool: True if successful, False otherwise
     """
     if not writable_dir:
         output_callback("❌ No writable directory provided!\n")
         return False
-        
+
     ansible_tmp_dir = os.path.join(writable_dir, ".ansible", "tmp")
     output_callback(f"Using Ansible temp directory: {ansible_tmp_dir}\n")
-    
+
     try:
         os.makedirs(ansible_tmp_dir, exist_ok=True)
 
         # Configure Ansible to use our writable directory
-        # Set the temporary directory paths
-        C.DEFAULT_LOCAL_TMP = ansible_tmp_dir
-        C.DEFAULT_REMOTE_TMP = ansible_tmp_dir
+        # Set the temporary directory paths (these constants might not exist)
+        if hasattr(C, 'DEFAULT_LOCAL_TMP'):
+            C.DEFAULT_LOCAL_TMP = ansible_tmp_dir
+        if hasattr(C, 'DEFAULT_REMOTE_TMP'):
+            C.DEFAULT_REMOTE_TMP = ansible_tmp_dir
 
         # Also set environment variables as fallback
         os.environ["ANSIBLE_LOCAL_TEMP"] = ansible_tmp_dir

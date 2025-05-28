@@ -16,7 +16,8 @@ from briefcase_ansible_test.utils import (
     setup_grp_module_mock,
     setup_subprocess_mock,
 )
-from briefcase_ansible_test.utils.ios_patches import setup_multiprocessing_mock
+# Import external ios-multiprocessing package
+import ios_multiprocessing
 
 # Import SSH utilities for Paramiko patching
 from briefcase_ansible_test.ssh_utils import patch_paramiko_for_async
@@ -154,6 +155,7 @@ print("iOS_DEBUG: Mock ansible.cli.scripts created")
 
 # Set up ansible_collections module hierarchy for iOS
 from .collections_setup import setup_ansible_collections
+
 setup_ansible_collections()
 
 # Import public functions for easier access

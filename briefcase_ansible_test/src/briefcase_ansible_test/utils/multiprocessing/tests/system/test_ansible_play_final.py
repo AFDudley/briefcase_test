@@ -12,7 +12,7 @@ sys.path.insert(0, "src")
 print("🔍 Final test of Ansible play execution...")
 
 # Apply system utils
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     setup_pwd_module_mock,
     setup_grp_module_mock,
     patch_getpass,

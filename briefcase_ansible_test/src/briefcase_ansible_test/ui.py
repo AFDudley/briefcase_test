@@ -6,6 +6,7 @@ import toga
 from toga.style import Pack
 import asyncio
 import threading
+import logging
 
 
 class UIComponents:

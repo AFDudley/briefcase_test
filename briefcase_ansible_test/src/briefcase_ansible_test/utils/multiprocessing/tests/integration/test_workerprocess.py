@@ -16,7 +16,7 @@ from briefcase_ansible_test.utils.multiprocessing import _patch_system_modules
 
 _patch_system_modules()
 
-from briefcase_ansible_test.utils.system_utils import (
+from briefcase_ansible_test.utils import (
     setup_pwd_module_mock,
     setup_grp_module_mock,
     patch_getpass,
@@ -153,7 +153,8 @@ try:
 
     # Test basic operations
     fq.put("test_message")
-    result = fq.get(timeout=1)
+    # FinalQueue.get() might not accept timeout parameter
+    result = fq.get()
     print(f"  ✅ FinalQueue basic operation: {result}")
 
     fq.close()

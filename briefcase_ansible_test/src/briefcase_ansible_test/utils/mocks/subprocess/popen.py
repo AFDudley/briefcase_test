@@ -12,7 +12,7 @@ from .module_executor import execute_ansible_module
 
 class MockPopen:
     """Mock implementation of subprocess.Popen for iOS."""
-    
+
     def __init__(self, args, **kwargs):
         print(f"iOS_DEBUG: Mocked subprocess.Popen call: {args}")
         self.args = args

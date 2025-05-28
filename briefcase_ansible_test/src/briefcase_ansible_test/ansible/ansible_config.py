@@ -12,7 +12,7 @@ from ansible.plugins.loader import init_plugin_loader
 def configure_ansible_context(key_path, connection_type="local", forks=1):
     """
     Configure Ansible CLI arguments and context.
-    
+
     Args:
         key_path: Path to SSH private key
         connection_type: Connection type (default: "local")
@@ -36,7 +36,7 @@ def configure_ansible_context(key_path, connection_type="local", forks=1):
 def initialize_plugin_loader(output_callback):
     """
     Initialize Ansible plugin loader.
-    
+
     Args:
         output_callback: Function to call with output messages
     """
@@ -48,18 +48,18 @@ def initialize_plugin_loader(output_callback):
 def setup_ansible_inventory(inventory_path, loader):
     """
     Set up Ansible inventory.
-    
+
     Args:
         inventory_path: Path to inventory file
         loader: Ansible DataLoader instance
-        
+
     Returns:
         tuple: (inventory, variable_manager)
     """
     from ansible.inventory.manager import InventoryManager
     from ansible.vars.manager import VariableManager
-    
+
     inventory = InventoryManager(loader=loader, sources=[inventory_path])
     variable_manager = VariableManager(loader=loader, inventory=inventory)
-    
+
     return inventory, variable_manager

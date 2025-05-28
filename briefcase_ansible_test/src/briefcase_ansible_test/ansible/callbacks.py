@@ -10,7 +10,7 @@ from ansible.plugins.callback import CallbackBase
 
 class SimpleCallback(CallbackBase):
     """Simple callback for capturing and displaying Ansible output."""
-    
+
     def __init__(self, output_callback):
         super().__init__()
         self.output_callback = output_callback
@@ -19,9 +19,7 @@ class SimpleCallback(CallbackBase):
         self.host_unreachable = {}
         # Thread debugging
         self.main_thread_id = threading.get_ident()
-        self.output_callback(
-            f"🧵 Callback created on thread: {self.main_thread_id}\n"
-        )
+        self.output_callback(f"🧵 Callback created on thread: {self.main_thread_id}\n")
 
     def v2_playbook_on_start(self, playbook):
         self.output_callback("📖 Playbook started\n")
@@ -33,9 +31,7 @@ class SimpleCallback(CallbackBase):
         self.output_callback(f"🔧 Task started: {task.get_name()}\n")
 
     def v2_runner_on_start(self, host, task):
-        self.output_callback(
-            f"🚀 Starting task on {host}: {task.get_name()}\n"
-        )
+        self.output_callback(f"🚀 Starting task on {host}: {task.get_name()}\n")
 
     def v2_runner_on_ok(self, result):
         host = result._host.get_name()
