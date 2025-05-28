@@ -110,7 +110,8 @@ patch_getpass()
 setup_pwd_module_mock()
 setup_grp_module_mock()
 setup_subprocess_mock()
-setup_multiprocessing_mock()
+# Use external ios-multiprocessing package instead of bundled version
+ios_multiprocessing.patch_system_modules()
 setup_ansible_text_module_mock()
 setup_ansible_basic_module_mock()
 

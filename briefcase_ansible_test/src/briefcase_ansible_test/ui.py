@@ -74,16 +74,28 @@ class UIComponents:
 
 
 class UIUpdater:
-    """Helper class for updating UI from background threads."""
+    """Helper class for updating UI from background threads with automatic logging."""
 
-    def __init__(self, output_view, status_label, main_event_loop):
+    def __init__(self, output_view, status_label, main_event_loop, logger=None):
         """Initialize with UI components to update."""
         self.output_view = output_view
         self.status_label = status_label
         self.main_event_loop = main_event_loop
+        self.logger = logger or logging.getLogger("UIUpdater")
 
     def add_text_to_output(self, text):
-        """Add text to the output view from any thread."""
+        """Add text to the output view from any thread and automatically log it."""
+        # Automatically log all output text
+        # Determine log level based on content
+        text_clean = text.strip()
+        if text_clean.startswith("✗") or "Error:" in text_clean or "failed:" in text_clean:
+            self.logger.error(f"UI OUTPUT: {text_clean}")
+        elif text_clean.startswith("⚠") or "warning" in text_clean.lower():
+            self.logger.warning(f"UI OUTPUT: {text_clean}")
+        elif text_clean.startswith("Traceback:") or "traceback" in text_clean.lower():
+            self.logger.error(f"UI TRACEBACK: {text_clean}")
+        elif text_clean.startswith("✓") or text_clean:
+            self.logger.info(f"UI OUTPUT: {text_clean}")
 
         def update_ui():
             self.output_view.value += text
@@ -100,7 +112,8 @@ class UIUpdater:
             asyncio.run_coroutine_threadsafe(update_text(), self.main_event_loop)
 
     def update_status(self, text):
-        """Update the status label from any thread."""
+        """Update the status label from any thread and log status changes."""
+        self.logger.info(f"STATUS: {text}")
 
         def update_ui():
             self.status_label.text = text
@@ -164,14 +177,13 @@ class BackgroundTaskRunner:
                 # Task completed successfully - clear the status
                 self.ui_updater.update_status("Ready")
             except Exception as error:
-                # Handle any exceptions
+                # Handle any exceptions - logging is automatic via UIUpdater
                 error_message = str(error)
-                self.ui_updater.add_text_to_output(f"Error: {error_message}")
+                traceback_str = traceback.format_exc()
+                
+                self.ui_updater.add_text_to_output(f"Error: {error_message}\n")
+                self.ui_updater.add_text_to_output(f"Traceback:\n{traceback_str}\n")
                 self.ui_updater.update_status("Error")
-                # Add traceback for debugging
-                self.ui_updater.add_text_to_output(
-                    f"\nTraceback:\n{traceback.format_exc()}"
-                )
 
         # Start background thread
         thread = threading.Thread(target=background_wrapper)

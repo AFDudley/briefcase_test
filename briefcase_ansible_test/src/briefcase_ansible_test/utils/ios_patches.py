@@ -21,13 +21,10 @@ def patch_getpass():
 
 def setup_multiprocessing_mock():
     """
-    Install our threading-based multiprocessing implementation in sys.modules.
+    Install multiprocessing implementation in sys.modules.
 
-    This replaces the standard multiprocessing module with our iOS-compatible
-    threading-based implementation that works without fork() or sem_open().
+    Uses the external ios-multiprocessing package instead of bundled version.
     """
-    # Import our threading-based multiprocessing implementation
-    from briefcase_ansible_test.utils.multiprocessing import patch_system_modules
-
-    # Apply the patch to replace multiprocessing with our implementation
-    patch_system_modules()
+    # Import external ios-multiprocessing package  
+    import ios_multiprocessing
+    ios_multiprocessing.patch_system_modules()
