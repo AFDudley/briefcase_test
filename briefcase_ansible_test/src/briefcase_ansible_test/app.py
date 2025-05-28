@@ -25,7 +25,7 @@ from briefcase_ansible_test.test_import_trace import test_import_trace
 from briefcase_ansible_test.test_ansible_workerprocess import test_ansible_workerprocess
 from briefcase_ansible_test.test_simple_workerprocess import test_simple_workerprocess
 from briefcase_ansible_test.test_ssh_connection import test_ssh_connection as test_ssh_connection_module
-from briefcase_ansible_test.test_ios_multiprocessing_integration import test_ios_multiprocessing_integration
+from briefcase_ansible_test.utils.data_processing import create_button_configs, ButtonConfig
 
 
 class BriefcaseAnsibleTest(toga.App):
@@ -36,6 +36,37 @@ class BriefcaseAnsibleTest(toga.App):
         self.background_tasks = set()
         self.app_logger = None
 
+    def _create_button_callbacks(self, button_configs: list[ButtonConfig]) -> list[tuple]:
+        """Map button configurations to actual callbacks.
+        
+        This method creates the actual callbacks from configuration data,
+        separating pure data from side effects.
+        """
+        callback_map = {
+            "ansible_ping_test": lambda widget: ansible_ping_test(self, widget),
+            "test_ssh_connection": lambda widget: self.background_task_runner.run_task(
+                lambda: test_ssh_connection(ui_updater=self.ui_updater),
+                "Testing SSH Connection with ed25519...",
+            ),
+            "generate_ed25519_key": lambda widget: self.background_task_runner.run_task(
+                lambda: generate_ed25519_key(self.paths.app, self.ui_updater),
+                "Generating ED25519 key...",
+            ),
+            "test_ssh_connection_generated": lambda widget: self.background_task_runner.run_task(
+                lambda: test_ssh_connection_with_generated_key(self.paths, self.ui_updater),
+                "Testing SSH Connection with generated key...",
+            ),
+            "run_droplet_playbook": lambda widget: self.background_task_runner.run_task(
+                lambda: run_droplet_playbook(self.paths, self.ui_updater),
+                "Creating rtorrent droplet...",
+            ),
+        }
+        
+        return [
+            (config.label, callback_map.get(config.callback_name), config.tooltip)
+            for config in button_configs
+        ]
+
     def startup(self):
         """Initialize the application."""
         # Set up logging first
@@ -45,46 +76,11 @@ class BriefcaseAnsibleTest(toga.App):
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
 
-        # Define button configurations as tuples: (label, callback, tooltip)
-        button_configs = [
-            (
-                "Local Ansible Ping Test",
-                lambda widget: ansible_ping_test(self, widget),
-                "Run Ansible ping test",
-            ),
-            (
-                "Test SSH Connection (ed25519)",
-                lambda widget: self.background_task_runner.run_task(
-                    lambda: test_ssh_connection(ui_updater=self.ui_updater),
-                    "Testing SSH Connection with ed25519...",
-                ),
-                "Test SSH connection using ed25519 key",
-            ),
-            (
-                "Generate ED25519 Key",
-                lambda widget: self.background_task_runner.run_task(
-                    lambda: generate_ed25519_key(self.paths.app, self.ui_updater),
-                    "Generating ED25519 key...",
-                ),
-                "Generate ED25519 SSH key using cryptography library",
-            ),
-            (
-                "Test SSH Connection with Generated Key",
-                lambda widget: self.background_task_runner.run_task(
-                    lambda: test_ssh_connection_with_generated_key(self.paths, self.ui_updater),
-                    "Testing SSH Connection with generated key...",
-                ),
-                "Test SSH connection using the generated ED25519 key",
-            ),
-            (
-                "Create rtorrent Droplet",
-                lambda widget: self.background_task_runner.run_task(
-                    lambda: run_droplet_playbook(self.paths, self.ui_updater),
-                    "Creating rtorrent droplet...",
-                ),
-                "Run the rtorrent droplet creation playbook from night2",
-            ),
-        ]
+        # Get button configurations from pure function
+        button_configs_data = create_button_configs()
+        
+        # Map configuration data to actual callbacks
+        button_configs = self._create_button_callbacks(button_configs_data)
 
         # Create action buttons using UIComponents
         action_buttons = UIComponents.create_action_buttons(self, button_configs)

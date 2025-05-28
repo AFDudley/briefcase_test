@@ -8,6 +8,13 @@ import tempfile
 import re
 
 from .module_executor import execute_ansible_module
+from briefcase_ansible_test.utils.data_processing import (
+    parse_command_args,
+    extract_ansible_temp_dir,
+    build_ansible_module_path,
+    format_ansible_result,
+    transform_ios_path
+)
 
 
 class MockPopen:
@@ -27,58 +34,49 @@ class MockPopen:
         stdout = b""
         stderr = b""
 
-        if isinstance(self.args, (list, tuple)) and len(self.args) > 0:
-            cmd = " ".join(str(arg) for arg in self.args)
-        else:
-            cmd = str(self.args)
+        # Parse command using pure function
+        cmd_info = parse_command_args(self.args)
+        cmd = cmd_info["command"]
 
-        # Handle common shell commands that Ansible uses
         # Use a writable iOS directory instead of /home/mobile
         ios_writable_dir = tempfile.gettempdir()
 
-        if "echo ~" in cmd or "echo $HOME" in cmd:
+        if cmd_info["is_echo"]:
             stdout = f"{ios_writable_dir}\n".encode()
-        elif 'echo "$(pwd)"' in cmd or "pwd" in cmd:
-            stdout = f"{ios_writable_dir}\n".encode()
-        elif "mkdir -p" in cmd and ".ansible/tmp" in cmd:
-            # Extract the temp directory name from mkdir command and redirect to writable location
-            if "ansible-tmp-" in cmd:
-                match = re.search(r"ansible-tmp-[\d\.-]+", cmd)
-                if match:
-                    temp_dir = match.group(0)
-                    ios_ansible_dir = f"{ios_writable_dir}/.ansible/tmp/{temp_dir}"
-                    stdout = f"{temp_dir}={ios_ansible_dir}\n".encode()
+        elif cmd_info["is_mkdir"] and ".ansible/tmp" in cmd:
+            # Extract the temp directory name from mkdir command
+            temp_dir = extract_ansible_temp_dir(cmd)
+            if temp_dir:
+                ios_ansible_dir = f"{ios_writable_dir}/.ansible/tmp/{temp_dir}"
+                stdout = f"{temp_dir}={ios_ansible_dir}\n".encode()
 
-                    # Actually create the directory
-                    try:
-                        os.makedirs(ios_ansible_dir, exist_ok=True)
-                        print(f"iOS_DEBUG: Created directory: {ios_ansible_dir}")
-                    except Exception as e:
-                        print(
-                            f"iOS_DEBUG: Failed to create directory {ios_ansible_dir}: {e}"
-                        )
-                else:
-                    stdout = f"ansible-tmp-123456789={ios_writable_dir}/.ansible/tmp/ansible-tmp-123456789\n".encode()
+                # Actually create the directory
+                try:
+                    os.makedirs(ios_ansible_dir, exist_ok=True)
+                    print(f"iOS_DEBUG: Created directory: {ios_ansible_dir}")
+                except Exception as e:
+                    print(
+                        f"iOS_DEBUG: Failed to create directory {ios_ansible_dir}: {e}"
+                    )
             else:
                 stdout = f"ansible-tmp-123456789={ios_writable_dir}/.ansible/tmp/ansible-tmp-123456789\n".encode()
-        elif "test -e" in cmd or "test -f" in cmd or "test -d" in cmd:
+        elif cmd_info["is_test"]:
             # File existence tests - return success (empty output, returncode 0)
             stdout = b""
-        elif "which " in cmd:
+        elif cmd_info["is_which"]:
             # which command - return a fake path
             stdout = b"/usr/bin/fake\n"
-        elif "chmod " in cmd:
+        elif cmd_info["is_chmod"]:
             # chmod commands - just return success
             stdout = b""
-        elif "python3" in cmd and "AnsiballZ_ping.py" in cmd:
+        elif cmd_info["is_ansible_module"]:
             # Real Ansible module execution - actually run the module
             print(f"iOS_DEBUG: Attempting to execute real Ansible module: {cmd}")
 
             try:
-                # Extract the path to the AnsiballZ_ping.py file
-                match = re.search(r"(/[^\s]+/AnsiballZ_ping\.py)", cmd)
-                if match:
-                    module_path = match.group(1)
+                # Extract the path to the AnsiballZ_ping.py file using pure function
+                module_path = build_ansible_module_path(cmd)
+                if module_path:
                     print(f"iOS_DEBUG: Found module path: {module_path}")
 
                     try:
@@ -96,16 +94,20 @@ class MockPopen:
                         print(
                             f"iOS_DEBUG: Exception traceback: {traceback.format_exc()}"
                         )
-                        # Return an error in Ansible's expected format
-                        error_result = {
-                            "failed": True,
-                            "msg": f"Module execution failed: {str(e)}",
-                            "exception": str(e),
-                        }
+                        # Return an error in Ansible's expected format using pure function
+                        error_result = format_ansible_result(
+                            success=False,
+                            message=f"Module execution failed: {str(e)}",
+                            exception=str(e)
+                        )
                         stdout = json.dumps(error_result).encode() + b"\n"
                 else:
                     print(f"iOS_DEBUG: Could not extract module path from command")
-                    stdout = b'{"failed": true, "msg": "Could not parse module path"}\n'
+                    error_result = format_ansible_result(
+                        success=False,
+                        message="Could not parse module path"
+                    )
+                    stdout = json.dumps(error_result).encode() + b"\n"
 
             except Exception as top_level_e:
                 print(

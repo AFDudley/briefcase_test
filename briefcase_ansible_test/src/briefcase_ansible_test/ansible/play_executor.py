@@ -9,6 +9,7 @@ import threading
 import traceback
 from ansible.playbook.play import Play
 from ansible.executor.task_queue_manager import TaskQueueManager
+from briefcase_ansible_test.utils.data_processing import build_ansible_play_dict
 
 
 def create_play(target_host):
@@ -21,12 +22,8 @@ def create_play(target_host):
     Returns:
         dict: Play source dictionary
     """
-    return {
-        "name": "Ansible Ping Test",
-        "hosts": target_host,
-        "gather_facts": False,
-        "tasks": [{"name": "ping test", "ping": {}}],
-    }
+    # Use pure function to build play dictionary
+    return build_ansible_play_dict(target_host, task_module="ping")
 
 
 def load_play(play_source, variable_manager, loader, output_callback):
