@@ -1,0 +1,36 @@
+---
+# Default variables for venv_executor role
+
+# Python interpreter to use for creating venv
+python_interpreter: python3
+
+# Base Python packages to install in every venv
+base_python_packages:
+  - pip
+  - setuptools
+  - wheel
+
+# Additional Python packages to install
+python_packages:
+  - ansible-core
+
+# Ansible collections to install
+ansible_collections: []
+
+# Whether to upgrade pip to latest version
+upgrade_pip: true
+
+# Whether to use system packages in venv
+system_site_packages: false
+
+# Venv creation command
+venv_command: "{{ python_interpreter }} -m venv"
+
+# Collection installation path
+collection_install_path: "{{ venv_path }}/ansible_collections"
+
+# Whether to require sudo for package installation
+require_sudo: false
+
+# Timeout for package installations (seconds)
+install_timeout: 300

@@ -1,0 +1,48 @@
+---
+# Tasks to execute a playbook within the virtual environment
+- name: Execute playbook in virtual environment
+  delegate_to: "{{ target_host }}"
+  block:
+    - name: Copy playbook to target if needed
+      copy:
+        src: "{{ playbook_to_run }}"
+        dest: "/tmp/{{ playbook_to_run | basename }}"
+      when: playbook_to_run is not match('^/')
+      register: copied_playbook
+
+    - name: Set playbook path
+      set_fact:
+        remote_playbook_path: "{{ copied_playbook.dest | default(playbook_to_run) }}"
+
+    - name: Prepare ansible-playbook command
+      set_fact:
+        ansible_command: |
+          source {{ actual_venv_path }}/bin/activate
+          ansible-playbook {{ remote_playbook_path }} \
+            -i localhost, \
+            -c local \
+            {% if extra_playbook_vars is defined %}
+            {% for key, value in extra_playbook_vars.items() %}
+            -e "{{ key }}={{ value }}" \
+            {% endfor %}
+            {% endif %}
+            {% if ansible_verbosity is defined %}
+            -{{ 'v' * ansible_verbosity }}
+            {% endif %}
+
+    - name: Execute playbook
+      shell: "{{ ansible_command }}"
+      environment: "{{ playbook_environment | default({}) | combine({'ANSIBLE_COLLECTIONS_PATH': actual_venv_path + '/ansible_collections'}) }}"
+      register: playbook_output
+
+    - name: Display playbook output
+      debug:
+        var: playbook_output.stdout_lines
+
+    - name: Cleanup copied playbook
+      file:
+        path: "{{ remote_playbook_path }}"
+        state: absent
+      when: 
+        - copied_playbook is defined
+        - copied_playbook.changed

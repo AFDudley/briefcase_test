@@ -1,0 +1,48 @@
+---
+# Main wrapper playbook for virtual environment management
+- name: Execute playbook via virtual environment
+  hosts: localhost
+  gather_facts: no
+  vars:
+    # Determine actual venv path based on persistence
+    actual_venv_path: "{{ persistent_venv_path if persist_venv else temp_venv_path }}"
+    temp_venv_path: "/tmp/ansible-venv-{{ venv_name | default(ansible_date_time.epoch) }}"
+    persistent_venv_path: "{{ ansible_env.HOME }}/ansible-venvs/{{ venv_name }}"
+    
+  tasks:
+    - name: Check if persistent venv exists
+      stat:
+        path: "{{ actual_venv_path }}"
+      delegate_to: "{{ target_host }}"
+      register: venv_exists
+      when: persist_venv
+
+    - name: Display venv status
+      debug:
+        msg: "{{ 'Using existing' if (venv_exists.stat.exists | default(false)) else 'Creating new' }} venv at {{ actual_venv_path }}"
+      delegate_to: "{{ target_host }}"
+
+    - name: Setup virtual environment
+      include_role:
+        name: venv_executor
+      delegate_to: "{{ target_host }}"
+      vars:
+        venv_path: "{{ actual_venv_path }}"
+        venv_action: "setup"
+
+    - name: Execute playbook in venv
+      include_tasks: execute_in_venv.yml
+      when: playbook_to_run is defined
+
+    - name: Collect metadata
+      include_tasks: collect_metadata.yml
+      when: collect_metadata | default(true)
+
+    - name: Cleanup temporary venv
+      file:
+        path: "{{ actual_venv_path }}"
+        state: absent
+      delegate_to: "{{ target_host }}"
+      when: 
+        - not persist_venv
+        - cleanup_venv | default(true)

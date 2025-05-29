@@ -1,0 +1,82 @@
+---
+# Main tasks for venv_executor role
+
+- name: Ensure Python3 and venv module are available
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - python3
+    - python3-venv
+    - python3-pip
+  become: "{{ require_sudo }}"
+  when: ensure_system_packages | default(true)
+
+- name: Create venv directory if persistent
+  file:
+    path: "{{ venv_path | dirname }}"
+    state: directory
+    mode: '0755'
+  when: persist_venv | default(false)
+
+- name: Create virtual environment
+  command: |
+    {{ venv_command }} {% if system_site_packages %}--system-site-packages{% endif %} {{ venv_path }}
+  args:
+    creates: "{{ venv_path }}/bin/activate"
+  register: venv_created
+
+- name: Upgrade pip if requested
+  pip:
+    name: pip
+    state: latest
+    virtualenv: "{{ venv_path }}"
+  when: upgrade_pip
+  async: "{{ install_timeout }}"
+  poll: 10
+
+- name: Install base Python packages
+  pip:
+    name: "{{ base_python_packages }}"
+    virtualenv: "{{ venv_path }}"
+    state: latest
+  async: "{{ install_timeout }}"
+  poll: 10
+
+- name: Install additional Python packages
+  pip:
+    name: "{{ python_packages }}"
+    virtualenv: "{{ venv_path }}"
+  when: python_packages | length > 0
+  async: "{{ install_timeout }}"
+  poll: 10
+
+- name: Create collections directory
+  file:
+    path: "{{ collection_install_path }}"
+    state: directory
+    mode: '0755'
+  when: ansible_collections | length > 0
+
+- name: Install Ansible collections
+  shell: |
+    source {{ venv_path }}/bin/activate
+    ansible-galaxy collection install {{ item }} -p {{ collection_install_path }}
+  loop: "{{ ansible_collections }}"
+  when: ansible_collections | length > 0
+  environment:
+    ANSIBLE_COLLECTIONS_PATH: "{{ collection_install_path }}"
+  async: "{{ install_timeout }}"
+  poll: 10
+
+- name: Verify venv is functional
+  shell: |
+    source {{ venv_path }}/bin/activate
+    python --version && ansible --version
+  register: venv_verify
+  changed_when: false
+
+- name: Display verification results
+  debug:
+    msg: "Virtual environment at {{ venv_path }} is functional"
+    verbosity: 1
