@@ -1,0 +1,30 @@
+---
+- name: Hello World Playbook
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  
+  tasks:
+    - name: Print hello world
+      debug:
+        msg: "Hello, World from Ansible!"
+    
+    - name: Print current date and time
+      debug:
+        msg: "Current time: {{ ansible_date_time.iso8601 }}"
+      when: false  # Skip this since gather_facts is disabled
+    
+    - name: Create a simple variable
+      set_fact:
+        greeting: "Hello from iOS!"
+    
+    - name: Use the variable
+      debug:
+        msg: "{{ greeting }}"
+    
+    - name: Display multiple messages
+      debug:
+        msg:
+          - "This is a simple test playbook"
+          - "Running on: localhost"
+          - "Connection type: local"
