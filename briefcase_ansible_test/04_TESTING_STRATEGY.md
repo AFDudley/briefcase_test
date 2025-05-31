@@ -35,6 +35,51 @@ For each code change:
    - Verify no functionality lost
    - Check for performance improvements
 
+## Using test_changes.sh Script
+
+### When to Use
+The `test_changes.sh` script should be used after making any code changes to quickly rebuild, deploy, and prepare for testing. It automates the entire briefcase build pipeline.
+
+### How to Use
+```bash
+# After making code changes, run:
+./test_changes.sh
+
+# The script will:
+# 1. Find the booted iOS simulator
+# 2. Run briefcase create/update/build
+# 3. Launch the app
+# 4. Output the log file path for testing
+```
+
+### Script Output
+The script provides:
+- Device ID of the booted simulator
+- App bundle path (for accessing resources)
+- Log file path (for checking detailed output)
+
+### Example Testing Workflow
+```bash
+# 1. Make code changes
+# Edit files as needed
+
+# 2. Run the test script
+./test_changes.sh
+
+# 3. Use the log file path provided to monitor output
+# Example: /Users/.../app/briefcase_ansible_test/logs/briefcase_ansible_test_*.log
+
+# 4. Use ios-interact MCP to test functionality
+# Take screenshots, click buttons, verify output
+```
+
+### Benefits
+- No need to remember briefcase command sequence
+- Automatically handles app rebuild and deployment
+- Provides exact log file location using xcrun
+- Runs app in background to avoid log following issues
+- Single command to go from code change to testable app
+
 ## ios-interact Commands Reference
 
 ```python

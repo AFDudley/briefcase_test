@@ -60,3 +60,7 @@ var/
 
 # Briefcase log files
 logs/
+
+# SSH keys and sensitive files
+src/briefcase_ansible_test/resources/keys/
+resources/keys/

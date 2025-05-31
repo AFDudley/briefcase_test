@@ -7,6 +7,7 @@ import sys
 import types
 import traceback
 import inspect
+from contextlib import contextmanager
 
 import briefcase_ansible_test
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -120,6 +121,47 @@ def load_ssh_key(key_path: str):
     )
 
 
+@contextmanager
+def ssh_client_context(hostname, username, port=22, pkey=None, timeout=5):
+    """
+    Context manager for SSH client connections with automatic cleanup.
+
+    Args:
+        hostname: The hostname to connect to
+        username: The username to authenticate as
+        port: The port to connect to (default: 22)
+        pkey: SSH key object for authentication
+        timeout: Connection timeout in seconds (default: 5)
+
+    Yields:
+        paramiko.SSHClient: Connected SSH client
+
+    Raises:
+        paramiko.AuthenticationException: If authentication fails
+        paramiko.SSHException: If SSH connection fails
+        Exception: For other connection errors
+    """
+    paramiko = import_paramiko()
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    try:
+        # Connect with the provided parameters
+        client.connect(
+            hostname=hostname,
+            username=username,
+            port=port,
+            pkey=pkey,
+            timeout=timeout,
+            allow_agent=False,
+            look_for_keys=False,
+        )
+        yield client
+    finally:
+        # Always close the client, even if an exception occurred
+        client.close()
+
+
 def test_ssh_connection(
     hostname="night2.lan", username="mtm", port=22, key_path=None, ui_updater=None
 ):
@@ -145,10 +187,6 @@ def test_ssh_connection(
             ui_updater.add_text_to_output(f"Paramiko version: {paramiko_version}\n")
             ui_updater.add_text_to_output("Initializing SSH client...\n")
 
-        # Create client instance
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
         # Use default key path if none provided
         if not key_path:
             # Try to find the app directory and default key
@@ -171,29 +209,19 @@ def test_ssh_connection(
                 f"Connecting to {hostname}:{port} as {username}...\n"
             )
 
-        # Connect with a timeout
-        client.connect(
-            hostname=hostname,
-            username=username,
-            port=port,
-            pkey=key,
-            timeout=5,
-            allow_agent=False,
-            look_for_keys=False,
-        )
+        # Use the context manager for automatic cleanup
+        with ssh_client_context(
+            hostname, username, port, pkey=key, timeout=5
+        ) as client:
+            if ui_updater:
+                ui_updater.add_text_to_output("✅ Connection successful!\n")
 
-        if ui_updater:
-            ui_updater.add_text_to_output("✅ Connection successful!\n")
+            # Test a simple command if connected
+            stdin, stdout, stderr = client.exec_command("echo Hello from Paramiko")
+            output = stdout.read().decode("utf-8").strip()
 
-        # Test a simple command if connected
-        stdin, stdout, stderr = client.exec_command("echo Hello from Paramiko")
-        output = stdout.read().decode("utf-8").strip()
-
-        if ui_updater:
-            ui_updater.add_text_to_output(f"Command output: {output}\n")
-
-        # Close connection
-        client.close()
+            if ui_updater:
+                ui_updater.add_text_to_output(f"Command output: {output}\n")
 
         if ui_updater:
             ui_updater.update_status("Connected")
@@ -250,9 +278,15 @@ def generate_ed25519_key(app_path, ui_updater=None):
     Returns:
         tuple: (success, private_key_path, public_key_path, public_key_str)
     """
+    from briefcase_ansible_test.ui.components import StatusReporter
+
+    status_reporter = StatusReporter()
+
     try:
         if ui_updater:
-            ui_updater.add_text_to_output("Generating new ED25519 key pair...\n")
+            ui_updater.add_text_to_output(
+                status_reporter.success("Starting ED25519 key pair generation") + "\n"
+            )
 
         # Create the SSH directory
         ssh_dir = create_ssh_directory(app_path)
@@ -288,7 +322,9 @@ def generate_ed25519_key(app_path, ui_updater=None):
 
         # Display information if ui_updater is provided
         if ui_updater:
-            ui_updater.add_text_to_output("Generated ED25519 key pair:\n")
+            ui_updater.add_text_to_output(
+                status_reporter.success("Generated ED25519 key pair") + "\n"
+            )
             ui_updater.add_text_to_output(f"Private key: {private_key_path}\n")
             ui_updater.add_text_to_output(f"Public key: {public_key_path}\n\n")
 
@@ -303,6 +339,8 @@ def generate_ed25519_key(app_path, ui_updater=None):
             chunks = [fingerprint[i : i + 2] for i in range(0, len(fingerprint), 2)]
             formatted_fp = ":".join(chunks)
             ui_updater.add_text_to_output(f"Key Fingerprint: {formatted_fp}\n")
+            # Show summary of status reporter
+            ui_updater.add_text_to_output("\n" + status_reporter.get_summary() + "\n")
             ui_updater.update_status("Key Generated")
 
         return True, private_key_path, public_key_path, public_key_str
@@ -310,11 +348,16 @@ def generate_ed25519_key(app_path, ui_updater=None):
     except ImportError as e:
         if ui_updater:
             ui_updater.add_text_to_output(
-                f"Error importing required modules: {str(e)}\n"
+                status_reporter.error(f"Import error: {str(e)}") + "\n"
             )
             ui_updater.add_text_to_output(
-                "Make sure 'cryptography' and 'paramiko' are installed.\n"
+                status_reporter.warning(
+                    "Make sure 'cryptography' and 'paramiko' are installed"
+                )
+                + "\n"
             )
+            # Show summary
+            ui_updater.add_text_to_output("\n" + status_reporter.get_summary() + "\n")
             ui_updater.update_status("Failed")
         return False, None, None, None
 
@@ -351,9 +394,7 @@ def test_ssh_connection_with_generated_key(app_paths, ui_updater):
             ui_updater.add_text_to_output(f"Could not read public key: {e}\n")
 
         # Test SSH connection using the existing test_ssh_connection function
-        ui_updater.add_text_to_output(
-            "Testing SSH connection with generated key...\n"
-        )
+        ui_updater.add_text_to_output("Testing SSH connection with generated key...\n")
         success = test_ssh_connection(
             "night2.lan", "mtm", key_path=private_key_path, ui_updater=ui_updater
         )
@@ -363,14 +404,10 @@ def test_ssh_connection_with_generated_key(app_paths, ui_updater):
                 "Generated key SSH connection test complete.\n"
             )
         else:
-            ui_updater.add_text_to_output(
-                "Generated key SSH connection test failed.\n"
-            )
+            ui_updater.add_text_to_output("Generated key SSH connection test failed.\n")
 
     except Exception as e:
-        ui_updater.add_text_to_output(
-            f"Generated key SSH connection failed: {e}\n"
-        )
+        ui_updater.add_text_to_output(f"Generated key SSH connection failed: {e}\n")
         import traceback
 
         ui_updater.add_text_to_output(f"Traceback:\n{traceback.format_exc()}\n")

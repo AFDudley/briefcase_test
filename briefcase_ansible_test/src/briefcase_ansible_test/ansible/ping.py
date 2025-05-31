@@ -5,11 +5,9 @@ This module contains functions for testing connectivity to Ansible hosts.
 """
 
 import os
-import sys
 import traceback
 
 from ansible.parsing.dataloader import DataLoader
-from ansible.executor.task_queue_manager import TaskQueueManager
 
 from .callbacks import SimpleCallback
 from .inventory_debug import debug_inventory_contents
@@ -22,6 +20,7 @@ from .ansible_config import (
     configure_ansible_context,
     initialize_plugin_loader,
     setup_ansible_inventory,
+    ansible_task_queue_manager,
 )
 from .play_executor import create_play, load_play, execute_play_with_timeout
 
@@ -113,19 +112,17 @@ def ansible_ping_test(app, widget):
             # Create callback for output
             results_callback = SimpleCallback(app.ui_updater.add_text_to_output)
 
-            # Run it with debugging
-            tqm = None
-            try:
-                app.ui_updater.add_text_to_output("Creating TaskQueueManager...\n")
-                tqm = TaskQueueManager(
-                    inventory=inventory,
-                    variable_manager=variable_manager,
-                    loader=loader,
-                    passwords=dict(),
-                    stdout_callback=results_callback,
-                    forks=1,
-                )
+            # Run it with debugging using context manager
+            app.ui_updater.add_text_to_output("Creating TaskQueueManager...\n")
 
+            with ansible_task_queue_manager(
+                inventory=inventory,
+                variable_manager=variable_manager,
+                loader=loader,
+                passwords=dict(),
+                stdout_callback=results_callback,
+                forks=1,
+            ) as tqm:
                 app.ui_updater.add_text_to_output("Running playbook...\n")
 
                 try:
@@ -142,16 +139,23 @@ def ansible_ping_test(app, widget):
 
                 # Check if any hosts were processed
                 if hasattr(results_callback, "host_ok"):
+                    host_ok_count = len(getattr(results_callback, "host_ok", {}))
                     app.ui_updater.add_text_to_output(
-                        f"Successful hosts: {len(getattr(results_callback, 'host_ok', {}))}\n"
+                        f"Successful hosts: {host_ok_count}\n"
                     )
                 if hasattr(results_callback, "host_failed"):
+                    host_failed_count = len(
+                        getattr(results_callback, "host_failed", {})
+                    )
                     app.ui_updater.add_text_to_output(
-                        f"Failed hosts: {len(getattr(results_callback, 'host_failed', {}))}\n"
+                        f"Failed hosts: {host_failed_count}\n"
                     )
                 if hasattr(results_callback, "host_unreachable"):
+                    host_unreachable_count = len(
+                        getattr(results_callback, "host_unreachable", {})
+                    )
                     app.ui_updater.add_text_to_output(
-                        f"Unreachable hosts: {len(getattr(results_callback, 'host_unreachable', {}))}\n"
+                        f"Unreachable hosts: {host_unreachable_count}\n"
                     )
 
                 if result == 0:
@@ -163,10 +167,7 @@ def ansible_ping_test(app, widget):
                         f"❌ Ansible ping test failed with result: {result}\n"
                     )
 
-            finally:
-                if tqm is not None:
-                    tqm.cleanup()
-                    app.ui_updater.add_text_to_output("🧹 Cleanup completed\n")
+            app.ui_updater.add_text_to_output("🧹 Cleanup completed\n")
 
         except Exception as e:
             app.ui_updater.add_text_to_output(
