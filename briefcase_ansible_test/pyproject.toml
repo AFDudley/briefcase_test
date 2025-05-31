@@ -44,3 +44,16 @@ requires = [
     "toga-iOS~=0.5.0",
     "std-nslog~=1.0.3",
 ]
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+include = '\.pyi?$'
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
+
+[tool.pyright]
+pythonVersion = "3.9"
+typeCheckingMode = "strict"
