@@ -8,23 +8,23 @@
    pip install briefcase
    pip install -e .
    ```
-3. **Run the app**:
+3. **Run the app** using the automated script:
    ```bash
-   briefcase run iOS --no-start-simulator
+   ./test_changes.sh
    ```
-4. **Note the bundle ID** from Xcode console output
+4. **Note the bundle ID** and log file path from script output
 
-## For Each Refactoring Session
+## For Development Sessions
 
-1. **Start fresh** (see 02_AI_CONTEXT_MANAGEMENT.md)
-2. **Identify current phase** in 03_REFACTORING_PHASES.md
-3. **Make changes** following 01_CODING_STANDARDS.md
-4. **Test immediately** using 04_TESTING_STRATEGY.md
-5. **Verify success** using the checklist in each phase
+1. **Start fresh** (see _02_AI_CONTEXT_MANAGEMENT.md if needed)
+2. **Identify current task** (Digital Ocean integration testing)
+3. **Make changes** following 03_CODING_STANDARDS.md
+4. **Test immediately** using `./test_changes.sh`
+5. **Verify success** using 04_TESTING_STRATEGY.md
 6. **Commit if successful**: 
    ```bash
    git add -u
-   git commit -m "refactor: Complete Phase X.Y - [description]"
+   git commit -m "feat: [description]"
    ```
 
 ## Common Issues and Solutions
@@ -47,7 +47,7 @@ find ~/Library/Developer/CoreSimulator/Devices/*/data/Containers/Data/Applicatio
 - Check that all dependencies are installed
 - Verify file paths match expected structure
 
-### Test Failures After Refactoring
+### Test Failures After Changes
 ```bash
 # Immediate rollback
 git reset --hard HEAD

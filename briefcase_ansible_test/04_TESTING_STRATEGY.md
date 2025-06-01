@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes how each refactoring phase will be tested using the ios-interact MCP server to ensure functionality is preserved throughout the refactoring process.
+This document describes how to test new features and integrations using the ios-interact MCP server, with primary focus on Digital Ocean integration testing for the distributed torrent architecture.
 
 ## Testing Environment
 
@@ -138,160 +138,95 @@ grep "iOS_DEBUG:" briefcase_ansible_test_*.log
 - **Timing information** for performance comparison
 - **Full exception tracebacks**
 
-## Phase-Specific Test Plans
+## Digital Ocean Integration Test Plans
 
-### Phase 1.1: SSH Key Loading
-**Test Steps:**
-1. Screenshot current "Test SSH Connection" output
-2. Implement `load_ssh_key()` refactoring
-3. Rebuild and launch app
-4. Click "Test SSH Connection (ed25519)"
-5. Verify output shows:
-   - "✓ Loaded ed25519 key successfully"
-   - Connection attempt proceeds normally
-6. Screenshot final result
+### Primary Test: rtorrent Droplet Creation
+**Objective:** Validate full Digital Ocean integration for distributed torrent architecture
 
-**Success Criteria:**
-- Key loads successfully
-- Same output messages as before
-- No new errors introduced
+**Prerequisites:**
+- Valid Digital Ocean API token
+- SSH key uploaded to DO account (name: 'briefcase_ansible')
+- Pre-built rtorrent snapshot ('remote-rtorrent-image')
+- Account quota for s-1vcpu-1gb droplets
 
-### Phase 1.2: Path Validation
-**Test Steps:**
-1. Launch app and click "Local Ansible Ping Test"
-2. Document all path-related messages
-3. Implement path validation utilities
-4. Re-test "Local Ansible Ping Test"
-5. Verify all paths found correctly:
-   - Inventory file found
-   - SSH key found
-   - Playbook resources found
+**Test Cases:**
 
-**Success Criteria:**
-- All required files located
-- Improved error messages for missing files
-- No change in successful execution
+#### Test 1: Missing API Key
+**Steps:**
+1. Ensure no `do.api_key` file exists
+2. Click "Create rtorrent Droplet"
+3. Verify error message: "❌ API key file not found"
 
-### Phase 1.3: Status Reporter
-**Test Steps:**
-1. Click "Generate ED25519 Key"
-2. Note current output format
-3. Implement StatusReporter
-4. Re-test key generation
-5. Verify formatted output:
-   - ✅ Success messages
-   - ❌ Error messages (if any)
-   - ⚠️ Warning messages (if any)
+#### Test 2: Invalid API Token
+**Steps:**
+1. Create `do.api_key` with invalid token
+2. Click "Create rtorrent Droplet"
+3. Monitor for Digital Ocean authentication errors
 
-**Success Criteria:**
-- Consistent status formatting
-- All messages properly categorized
-- Summary statistics available
+#### Test 3: Missing SSH Key
+**Steps:**
+1. Use valid API token but wrong SSH key name
+2. Click "Create rtorrent Droplet"
+3. Verify SSH key lookup failure in Ansible execution
 
-### Phase 2.1: SSH Context Manager
-**Test Steps:**
-1. Run "Test SSH Connection" multiple times
-2. Check for any resource leaks
-3. Implement context manager
-4. Re-test SSH connection
-5. Force an error (wrong host) to test cleanup
+#### Test 4: Missing Snapshot
+**Steps:**
+1. Valid API/SSH setup but no rtorrent snapshot
+2. Click "Create rtorrent Droplet"
+3. Verify snapshot lookup failure
 
-**Success Criteria:**
-- Connection works as before
-- Proper cleanup on success
-- Proper cleanup on failure
-- No hanging connections
+#### Test 5: Successful Droplet Creation
+**Steps:**
+1. Valid API token, SSH key, and snapshot
+2. Click "Create rtorrent Droplet"
+3. Monitor 5-minute timeout for completion
+4. Verify droplet creation in Digital Ocean console
+5. **CRITICAL:** Immediately destroy droplet
 
-### Phase 2.2: Ansible TQM Context Manager
-**Test Steps:**
-1. Run "Local Ansible Ping Test"
-2. Monitor for cleanup messages
-3. Implement TQM context manager
-4. Re-test with success scenario
-5. Test with failure scenario (bad inventory)
+**Expected Success Output:**
+- "✅ Digital Ocean API key loaded"
+- "✅ Playbook found"
+- "✅ Ansible components initialized"
+- Ansible task execution progress
+- "✅ Droplet creation completed successfully!"
+- Connection details with IP address
 
-**Success Criteria:**
-- TQM cleanup always occurs
-- No resource leaks
-- Error handling maintained
+### Secondary Tests: Core Functionality
 
-### Phase 3.1: SSH Command Execution
-**Test Steps:**
-1. Run "Test SSH Connection"
-2. Note all executed commands
-3. Implement `execute_ssh_command()`
-4. Re-test all commands:
-   - `whoami`
-   - `echo $SHELL`
-   - `python3 --version`
+#### Baseline Functionality Verification
+1. **SSH Test**: "Test SSH Connection" → Verify simplified function works
+2. **Ansible Test**: "Local Ansible Ping Test" → Verify ping success
+3. **Key Generation**: "Generate ED25519 Key" → Verify streamlined output
+4. **Generated Key Test**: "Test SSH Connection with Generated Key" → Verify integration
 
-**Success Criteria:**
-- All commands execute
-- Output captured correctly
-- Error handling works
+### Integration Workflow Test
 
-### Phase 3.2: MockPopen Dispatch
-**Test Steps:**
-1. Run "Local Ansible Ping Test" on iOS
-2. Enable iOS debug output
-3. Implement dispatch dictionary
-4. Re-test on iOS simulator
-5. Verify all command types handled:
-   - echo commands
-   - mkdir commands
-   - ansible module execution
-
-**Success Criteria:**
-- Ansible ping succeeds on iOS
-- All mock commands handled
-- Cleaner code structure
-
-### Phase 4: Complex Function Testing
-**Test Each Extraction:**
-1. Baseline screenshot
-2. Extract one function
-3. Test immediately
-4. Verify identical behavior
-5. Proceed to next extraction
-
-**Critical Tests:**
-- Ansible ping completes successfully
-- All debug output preserved
-- Error scenarios handled
-- Performance not degraded
-
-### Phase 5: Common Pattern Testing
-**Integration Tests:**
-1. Test all Ansible operations
-2. Verify consistent behavior
-3. Check for any timing issues
-4. Validate error handling
-
-### Phase 6: Final Testing
-**Complete App Test:**
-1. Click every button in sequence
-2. Verify all functionality
-3. Check for memory leaks
-4. Performance comparison
-5. Final screenshots
+**Complete User Journey:**
+1. Generate SSH key in app
+2. Upload public key to Digital Ocean manually
+3. Create API key file with real token
+4. Create rtorrent droplet
+5. Verify droplet connectivity
+6. Clean up resources
 
 ## Regression Test Suite
 
-After each phase, run this minimal regression suite:
+Before any Digital Ocean testing, verify core functionality:
 
-1. **SSH Test**: Click "Test SSH Connection" → Verify success
-2. **Ansible Test**: Click "Local Ansible Ping Test" → Verify ping success
-3. **Key Generation**: Click "Generate ED25519 Key" → Verify key created
+1. **SSH Test**: Click "Test SSH Connection" → Verify simplified 24-line function
+2. **Ansible Test**: Click "Local Ansible Ping Test" → Verify streamlined execution
+3. **Key Generation**: Click "Generate ED25519 Key" → Verify concise output
 4. **UI Responsiveness**: Verify no UI freezing during operations
 
 ## Error Injection Tests
 
-For robust testing, deliberately cause errors:
+For robust Digital Ocean testing:
 
-1. **Missing File**: Rename inventory file → Verify graceful error
-2. **Bad Permissions**: chmod 000 on key file → Verify error handling
-3. **Network Issues**: Use non-existent host → Verify timeout handling
-4. **iOS Specific**: Test iOS-specific paths → Verify proper mocking
+1. **Missing API File**: Remove `do.api_key` → Verify graceful error
+2. **Bad API Token**: Invalid token → Verify authentication error
+3. **Network Issues**: Test timeout handling in droplet creation
+4. **Account Limits**: Test quota exceeded scenarios
+5. **Missing Resources**: Test missing SSH keys/snapshots in DO account
 
 ## Using Logs in Testing Workflow
 
