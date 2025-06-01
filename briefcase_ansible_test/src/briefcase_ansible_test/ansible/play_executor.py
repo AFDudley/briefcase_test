@@ -12,18 +12,6 @@ from ansible.executor.task_queue_manager import TaskQueueManager
 from briefcase_ansible_test.utils.data_processing import build_ansible_play_dict
 
 
-def create_play(target_host):
-    """
-    Create an Ansible play with a ping task.
-
-    Args:
-        target_host: Host pattern for the play
-
-    Returns:
-        dict: Play source dictionary
-    """
-    # Use pure function to build play dictionary
-    return build_ansible_play_dict(target_host, task_module="ping")
 
 
 def load_play(play_source, variable_manager, loader, output_callback):

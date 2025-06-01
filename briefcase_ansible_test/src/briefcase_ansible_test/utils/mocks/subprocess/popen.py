@@ -3,7 +3,6 @@ Mock Popen implementation for iOS.
 """
 
 import os
-import json
 import tempfile
 
 from .module_executor import execute_ansible_module
@@ -11,7 +10,6 @@ from briefcase_ansible_test.utils.data_processing import (
     parse_command_args,
     extract_ansible_temp_dir,
     build_ansible_module_path,
-    format_ansible_result,
 )
 
 
@@ -56,10 +54,10 @@ class MockPopen:
             # Execute ansible module
             print(f"iOS_DEBUG: Executing Ansible module: {cmd}")
             module_path = build_ansible_module_path(cmd)
-            
+
             if not module_path:
                 raise ValueError("Could not parse module path from ansible command")
-            
+
             result = execute_ansible_module(module_path)
             print(f"iOS_DEBUG: Module success, len: {len(result)}")
             return result.encode() + b"\n", b""

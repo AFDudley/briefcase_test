@@ -3,7 +3,7 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 """
 
 # Standard library imports
-import os
+
 import asyncio
 
 # Third-party imports
@@ -28,7 +28,7 @@ class BriefcaseAnsibleTest(toga.App):
 
     def _create_button_callbacks(self, button_configs: list[ButtonConfig]) -> list[tuple]:
         """Map button configurations to actual callbacks.
-        
+
         This method creates the actual callbacks from configuration data,
         separating pure data from side effects.
         """
@@ -51,7 +51,7 @@ class BriefcaseAnsibleTest(toga.App):
                 "Creating rtorrent droplet...",
             ),
         }
-        
+
         return [
             (config.label, callback_map.get(config.callback_name), config.tooltip)
             for config in button_configs
@@ -60,15 +60,15 @@ class BriefcaseAnsibleTest(toga.App):
     def startup(self):
         """Initialize the application."""
         # Set up logging first
-        log_file = setup_app_logging(self.paths)
+        setup_app_logging(self.paths)
         self.app_logger = AppLogger()
-        
+
         # Store a reference to the main event loop for background threads
         self.main_event_loop = asyncio.get_event_loop()
 
         # Get button configurations from pure function
         button_configs_data = create_button_configs()
-        
+
         # Map configuration data to actual callbacks
         button_configs = self._create_button_callbacks(button_configs_data)
 
@@ -101,14 +101,5 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_window.size = (600, 400)
         self.main_window.show()
 
-    def test_paramiko_connection(self, widget):
-        """Test a basic Paramiko SSH connection."""
-        # Run the task in a background thread with defaults
-        self.background_task_runner.run_task(
-            lambda: test_ssh_connection(ui_updater=self.ui_updater),
-            "Testing Paramiko connection..."
-        )
 
 
-def main():
-    return BriefcaseAnsibleTest()

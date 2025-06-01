@@ -1,4 +1,4 @@
-from briefcase_ansible_test.app import main
+from briefcase_ansible_test.app import BriefcaseAnsibleTest
 
 if __name__ == "__main__":
-    main().main_loop()
+    BriefcaseAnsibleTest().main_loop()
