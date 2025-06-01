@@ -162,6 +162,45 @@ def ssh_client_context(hostname, username, port=22, pkey=None, timeout=5):
         client.close()
 
 
+def execute_ssh_command(client, command, timeout=None):
+    """
+    Execute a command on an SSH client and return the result.
+
+    Args:
+        client: Connected paramiko SSHClient instance
+        command: Command string to execute
+        timeout: Optional timeout for command execution
+
+    Returns:
+        tuple: (success, stdout, stderr) where:
+            - success: Boolean indicating if command succeeded (exit code 0)
+            - stdout: String containing standard output
+            - stderr: String containing standard error
+
+    Raises:
+        Exception: If command execution fails catastrophically
+    """
+    try:
+        # Execute the command
+        stdin, stdout, stderr = client.exec_command(command, timeout=timeout)
+
+        # Read output and error streams
+        stdout_data = stdout.read().decode("utf-8").strip()
+        stderr_data = stderr.read().decode("utf-8").strip()
+
+        # Get exit status
+        exit_status = stdout.channel.recv_exit_status()
+
+        # Success is determined by exit status
+        success = exit_status == 0
+
+        return success, stdout_data, stderr_data
+
+    except Exception as e:
+        # Return failure with exception information
+        return False, "", str(e)
+
+
 def test_ssh_connection(
     hostname="night2.lan", username="mtm", port=22, key_path=None, ui_updater=None
 ):
@@ -216,12 +255,33 @@ def test_ssh_connection(
             if ui_updater:
                 ui_updater.add_text_to_output("✅ Connection successful!\n")
 
-            # Test a simple command if connected
-            stdin, stdout, stderr = client.exec_command("echo Hello from Paramiko")
-            output = stdout.read().decode("utf-8").strip()
+            # Test multiple commands
+            test_commands = [
+                ("echo Hello from Paramiko", "Basic echo test"),
+                ("whoami", "Username check"),
+                ("echo $SHELL", "Shell check"),
+                ("python3 --version", "Python version"),
+            ]
 
-            if ui_updater:
-                ui_updater.add_text_to_output(f"Command output: {output}\n")
+            all_success = True
+            for command, description in test_commands:
+                if ui_updater:
+                    ui_updater.add_text_to_output(f"\nTesting: {description}\n")
+
+                success, output, error = execute_ssh_command(client, command)
+
+                if success:
+                    if ui_updater:
+                        ui_updater.add_text_to_output(f"✓ Command: {command}\n")
+                        ui_updater.add_text_to_output(f"  Output: {output}\n")
+                else:
+                    if ui_updater:
+                        ui_updater.add_text_to_output(f"✗ Command failed: {command}\n")
+                        ui_updater.add_text_to_output(f"  Error: {error}\n")
+                    all_success = False
+
+            if not all_success:
+                return False
 
         if ui_updater:
             ui_updater.update_status("Connected")

@@ -160,8 +160,7 @@ from .collections_setup import setup_ansible_collections
 setup_ansible_collections()
 
 # Import public functions for easier access
-from briefcase_ansible_test.ansible.inventory import parse_ansible_inventory
-from briefcase_ansible_test.ansible.ping import ansible_ping_test
+
 from briefcase_ansible_test.ansible.playbook import (
     parse_ansible_playbook,
     run_ansible_playbook,
