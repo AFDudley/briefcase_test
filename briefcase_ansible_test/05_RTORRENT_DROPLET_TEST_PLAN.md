@@ -13,11 +13,20 @@ This document outlines the comprehensive test plan for the "Create rtorrent Drop
 - **SSH Key**: Hardcoded as `'briefcase_ansible'` in extra_vars (line 61)
 
 ### Current Implementation Issues Identified
-1. **API Key Storage**: Uses file-based storage instead of environment variable
-2. **SSH Key Name**: Hardcoded as `'briefcase_ansible'` vs playbook expects `ssh_key_name`
+1. **API Key Storage**: Uses file-based storage instead of environment variable ✓ (correct for iOS)
+2. **SSH Key Approach**: Hardcoded key name requires manual DO setup
 3. **Variable Mismatch**: Code uses `digitalocean_token` but playbook expects `api_token`
-4. **Error Handling**: Limited error scenarios covered
-5. **Cleanup**: No automatic droplet cleanup mechanism
+4. **SSH Variable Mismatch**: Code uses `ssh_key` but playbook expects `ssh_key_name`
+5. **Error Handling**: Limited error scenarios covered
+6. **Cleanup**: No automatic droplet/key cleanup mechanism
+
+### Improved Approach: Ephemeral SSH Keys
+Instead of requiring pre-existing SSH keys in DO account, the app should:
+1. **Generate ephemeral SSH key pair** using existing `generate_ed25519_key()` function
+2. **Upload key to DO** via API with unique name (e.g., `rtorrent-{timestamp}`)
+3. **Create droplet** with the generated key
+4. **Store private key** for droplet access
+5. **Clean up** both droplet and SSH key when done
 
 ## Prerequisites Setup
 
@@ -25,11 +34,11 @@ This document outlines the comprehensive test plan for the "Create rtorrent Drop
 **Note**: Environment variables are NOT available in iOS apps. The implementation correctly uses file-based configuration.
 
 ### Digital Ocean Account Requirements
-1. **API Token**: Full droplet management permissions
-2. **SSH Key**: Upload public key to DO account with name `briefcase_ansible`
-3. **rtorrent Snapshot**: Pre-built image named `remote-rtorrent-image`
-4. **Account Limits**: Sufficient quota for s-1vcpu-1gb droplets (~$0.007/hour)
-5. **Cost Budget**: Immediate cleanup after testing to minimize costs
+1. **API Token**: Full droplet management permissions (including SSH key management)
+2. **rtorrent Snapshot**: Pre-built image named `remote-rtorrent-image`
+3. **Account Limits**: Sufficient quota for s-1vcpu-1gb droplets (~$0.007/hour)
+4. **Cost Budget**: Immediate cleanup after testing to minimize costs
+5. **SSH Key**: No pre-existing key required - app will generate ephemeral keys
 
 ### Required Files to Create
 ```bash
@@ -84,13 +93,14 @@ echo "your_do_token_here" > src/briefcase_ansible_test/resources/api_keys/do.api
 2. Click button
 3. Monitor logs for API authentication errors
 
-#### 2.3 Test Case 3: Missing SSH Key
-**Scenario**: SSH key 'briefcase_ansible' not found in DO account  
-**Expected**: SSH key lookup failure in playbook execution  
+#### 2.3 Test Case 3: SSH Key Generation/Upload
+**Scenario**: Test ephemeral SSH key generation and upload  
+**Expected**: Successful key generation, upload to DO, and use in droplet  
 **Steps**:
-1. Ensure SSH key doesn't exist in DO account (or use different name)
+1. Valid API token and snapshot exist
 2. Click button
-3. Verify error in Ansible task execution
+3. Verify SSH key generated and uploaded with timestamp name
+4. Verify droplet created with same name as key
 
 #### 2.4 Test Case 4: Missing rtorrent Snapshot
 **Scenario**: No snapshot named 'remote-rtorrent-image'  
@@ -137,17 +147,55 @@ Based on analysis of `droplet_management.py` vs `start_rtorrent_droplet.yml`:
    - iOS Reality: Environment variables not available
    - **Fix**: Playbook must rely on extra_vars, not environment lookup
 
-#### 3.2 Required Code Fixes
+#### 3.2 Required Code Fixes - Basic
 ```python
-# In droplet_management.py lines 59-62, change:
+# Minimum fix in droplet_management.py lines 59-62:
 variable_manager.extra_vars = {
     'api_token': api_key,                    # Fixed variable name
     'ssh_key_name': 'briefcase_ansible'      # Fixed variable name
 }
 ```
 
-#### 3.3 Playbook Compatibility Issue
-The playbook line 12 uses `{{ lookup('env', 'DIGITALOCEAN_TOKEN') }}` which will fail in iOS. The code correctly passes the token via extra_vars, but we need to ensure the playbook uses the passed variable instead of environment lookup.
+#### 3.3 Enhanced Implementation - Ephemeral Keys
+```python
+# Better approach with ephemeral SSH keys:
+import time
+from briefcase_ansible_test.ssh_utils import generate_ed25519_key
+
+# Generate ephemeral SSH key
+success, private_key_path, public_key_path, public_key_str = generate_ed25519_key(
+    app_paths.app, ui_updater
+)
+
+# Create unique name for both key and droplet
+timestamp = int(time.time())
+resource_name = f"rtorrent-{timestamp}"
+
+# Pass to playbook
+variable_manager.extra_vars = {
+    'api_token': api_key,
+    'droplet_name': resource_name,      # Same name for droplet
+    'ssh_key_name': resource_name,      # Same name for SSH key
+    'ssh_public_key': public_key_str,
+    'cleanup_ssh_key': True  # Flag for cleanup
+}
+```
+
+#### 3.4 Playbook Enhancement Required
+Add SSH key upload task before droplet creation:
+```yaml
+- name: Upload ephemeral SSH key to Digital Ocean
+  community.digitalocean.digital_ocean_sshkey:
+    oauth_token: "{{ api_token }}"
+    name: "{{ ssh_key_name }}"
+    ssh_pub_key: "{{ ssh_public_key }}"
+    state: present
+  register: ssh_key_result
+
+- name: Use key ID for droplet creation
+  set_fact:
+    ssh_key_id: "{{ ssh_key_result.data.ssh_key.id }}"
+```
 
 #### 3.3 Enhanced Error Handling
 Add specific error handling for:
@@ -157,6 +205,22 @@ Add specific error handling for:
 - SSH key not found
 - Network timeouts
 
+#### 3.5 Cleanup Implementation
+Add cleanup playbook or tasks to remove both droplet and SSH key:
+```yaml
+- name: Destroy rtorrent droplet
+  community.digitalocean.digital_ocean_droplet:
+    oauth_token: "{{ api_token }}"
+    name: "{{ droplet_name }}"
+    state: absent
+    
+- name: Remove ephemeral SSH key
+  community.digitalocean.digital_ocean_sshkey:
+    oauth_token: "{{ api_token }}"
+    name: "{{ ssh_key_name }}"
+    state: absent
+```
+
 ### Phase 4: Testing Execution Steps
 
 #### 4.1 Pre-Test Setup
@@ -164,19 +228,19 @@ Add specific error handling for:
 # 1. Backup current code
 git stash  # Save any changes
 
-# 2. Apply the critical code fixes first
-# Edit droplet_management.py to fix variable names:
-# Change 'digitalocean_token' → 'api_token'
-# Change 'ssh_key' → 'ssh_key_name'
+# 2. Implement ephemeral key approach (or apply basic fixes)
+# Option A: Implement full ephemeral key solution
+# Option B: Apply minimum variable name fixes
 
 # 3. Create API key file
 mkdir -p src/briefcase_ansible_test/resources/api_keys/
 echo "dop_v1_your_actual_token_here" > src/briefcase_ansible_test/resources/api_keys/do.api_key
 
 # 4. Verify DO account prerequisites
-# - SSH key 'briefcase_ansible' uploaded to Digital Ocean
+# - API token has SSH key management permissions
 # - Snapshot 'remote-rtorrent-image' exists in DO account
 # - Account has sufficient droplet quota
+# - NO pre-existing SSH key required (ephemeral approach)
 
 # 5. Deploy to simulator
 ./test_changes.sh
@@ -209,8 +273,10 @@ Watch for:
 - [ ] **API Integration**: Successful communication with Digital Ocean
 - [ ] **Ansible Execution**: Playbook runs correctly in iOS environment
 - [ ] **Variable Passing**: Correct parameter transmission to playbook
+- [ ] **Ephemeral Resources**: SSH key generated, uploaded, and used successfully
+- [ ] **Resource Naming**: Droplet and SSH key share same timestamp-based name
 - [ ] **Timeout Handling**: 5-minute timeout works properly
-- [ ] **Cost Control**: Immediate droplet cleanup capability
+- [ ] **Cost Control**: Automatic cleanup of both droplet and SSH key
 
 #### 5.2 Deliverables
 1. **Test Results Report**: Detailed results for all test cases
