@@ -21,11 +21,8 @@ This document outlines the comprehensive test plan for the "Create rtorrent Drop
 
 ## Prerequisites Setup
 
-### Environment Variables Required
-```bash
-export DIGITALOCEAN_TOKEN="your_real_do_token"
-export SSH_KEY_NAME="briefcase_ansible"  # Must match hardcoded value
-```
+### iOS-Compatible Configuration
+**Note**: Environment variables are NOT available in iOS apps. The implementation correctly uses file-based configuration.
 
 ### Digital Ocean Account Requirements
 1. **API Token**: Full droplet management permissions
@@ -34,11 +31,14 @@ export SSH_KEY_NAME="briefcase_ansible"  # Must match hardcoded value
 4. **Account Limits**: Sufficient quota for s-1vcpu-1gb droplets (~$0.007/hour)
 5. **Cost Budget**: Immediate cleanup after testing to minimize costs
 
-### Files to Create
+### Required Files to Create
 ```bash
-# Create API key file as expected by current implementation
+# Create API key file (iOS-compatible approach)
 mkdir -p src/briefcase_ansible_test/resources/api_keys/
-echo "your_real_do_token" > src/briefcase_ansible_test/resources/api_keys/do.api_key
+echo "dop_v1_your_actual_token_here" > src/briefcase_ansible_test/resources/api_keys/do.api_key
+
+# Note: Replace with your actual Digital Ocean API token
+# Token format: dop_v1_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## Test Execution Plan
@@ -119,27 +119,35 @@ echo "your_do_token_here" > src/briefcase_ansible_test/resources/api_keys/do.api
 
 ### Phase 3: Implementation Improvements
 
-#### 3.1 Current Code Issues to Address
-Based on analysis of `droplet_management.py`:
+#### 3.1 Critical Code Issues to Fix
+Based on analysis of `droplet_management.py` vs `start_rtorrent_droplet.yml`:
 
 1. **Variable Name Mismatch**:
    - Code sets: `'digitalocean_token': api_key`
-   - Playbook expects: `api_token: "{{ lookup('env', 'DIGITALOCEAN_TOKEN') }}"`
+   - Playbook expects: `api_token` variable
    - **Fix**: Change extra_vars to use `'api_token': api_key`
 
-2. **SSH Key Name Mismatch**:
+2. **SSH Key Variable Mismatch**:
    - Code sets: `'ssh_key': 'briefcase_ansible'`
    - Playbook expects: `ssh_key_name` variable
    - **Fix**: Change to `'ssh_key_name': 'briefcase_ansible'`
 
-#### 3.2 Recommended Code Fixes
+3. **Environment Variable Issue**:
+   - Playbook tries: `{{ lookup('env', 'DIGITALOCEAN_TOKEN') }}`
+   - iOS Reality: Environment variables not available
+   - **Fix**: Playbook must rely on extra_vars, not environment lookup
+
+#### 3.2 Required Code Fixes
 ```python
-# In droplet_management.py line 59-62, change:
+# In droplet_management.py lines 59-62, change:
 variable_manager.extra_vars = {
-    'api_token': api_key,        # Changed from 'digitalocean_token'
-    'ssh_key_name': 'briefcase_ansible'  # Changed from 'ssh_key'
+    'api_token': api_key,                    # Fixed variable name
+    'ssh_key_name': 'briefcase_ansible'      # Fixed variable name
 }
 ```
+
+#### 3.3 Playbook Compatibility Issue
+The playbook line 12 uses `{{ lookup('env', 'DIGITALOCEAN_TOKEN') }}` which will fail in iOS. The code correctly passes the token via extra_vars, but we need to ensure the playbook uses the passed variable instead of environment lookup.
 
 #### 3.3 Enhanced Error Handling
 Add specific error handling for:
@@ -156,16 +164,21 @@ Add specific error handling for:
 # 1. Backup current code
 git stash  # Save any changes
 
-# 2. Create API key file
+# 2. Apply the critical code fixes first
+# Edit droplet_management.py to fix variable names:
+# Change 'digitalocean_token' → 'api_token'
+# Change 'ssh_key' → 'ssh_key_name'
+
+# 3. Create API key file
 mkdir -p src/briefcase_ansible_test/resources/api_keys/
 echo "dop_v1_your_actual_token_here" > src/briefcase_ansible_test/resources/api_keys/do.api_key
 
-# 3. Verify DO account prerequisites
-# - SSH key 'briefcase_ansible' uploaded
-# - Snapshot 'remote-rtorrent-image' exists
-# - Account has droplet quota
+# 4. Verify DO account prerequisites
+# - SSH key 'briefcase_ansible' uploaded to Digital Ocean
+# - Snapshot 'remote-rtorrent-image' exists in DO account
+# - Account has sufficient droplet quota
 
-# 4. Deploy to simulator
+# 5. Deploy to simulator
 ./test_changes.sh
 ```
 
@@ -216,14 +229,16 @@ Watch for:
 
 ### Technical Risk Mitigation
 - **Code Backup**: Git stash before modifications
+- **Variable Fix Required**: Must fix variable name mismatches before testing
 - **Limited Scope**: Test one scenario at a time
 - **Error Recovery**: Plan for stuck processes
-- **Network Issues**: Test timeout handling
+- **iOS Environment**: No environment variables available, file-based only
 
 ### Security Considerations
-- **API Key Protection**: Don't commit real tokens to git
+- **API Key Protection**: Don't commit real tokens to git (add `*.api_key` to .gitignore)
 - **Key Rotation**: Use temporary/testing API keys where possible
 - **Access Control**: Verify minimal required permissions
+- **File Permissions**: Ensure API key file is readable by app
 
 ## Expected Timeline
 - **Setup**: 30 minutes (API key, SSH key verification)
