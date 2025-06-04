@@ -5,90 +5,29 @@ SSH-based tests for venv_management executor.py functions using real remote conn
 Tests the same 4 core scenarios as test_venv_executor.py but with real SSH connections
 to night2.lan using the actual inventory file and SSH keys.
 """
+# flake8: noqa: E402
 
+import subprocess
 import sys
 import tempfile
-import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
-
-# Import the main function we'll test
-from briefcase_ansible_test.ansible.venv_management.executor import (
-    run_playbook_with_venv,
-)
-from briefcase_ansible_test.ansible.venv_management.metadata import (
-    save_venv_metadata,
-    load_venv_metadata,
-)
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Mock iOS dependencies before importing
-sys.modules["rubicon"] = MagicMock()
-sys.modules["rubicon.objc"] = MagicMock()
+import pytest
+
+from briefcase_ansible_test.ansible.venv_management.executor import (
+    run_playbook_with_venv,
+)
+from briefcase_ansible_test.ansible.venv_management.metadata import (
+    load_venv_metadata,
+    save_venv_metadata,
+)
 
 
 class TestVenvManagementSSH:
     """Test executor.py functions with real SSH connections to night2.lan."""
-
-    @pytest.fixture
-    def ssh_check(self):
-        """Check SSH connectivity to night2.lan."""
-        ssh_key_path = str(
-            Path(__file__).parent.parent
-            / "src"
-            / "briefcase_ansible_test"
-            / "resources"
-            / "keys"
-            / "briefcase_test_key"
-        )
-
-        ssh_test = subprocess.run(
-            [
-                "ssh",
-                "-i",
-                ssh_key_path,
-                "-o",
-                "ConnectTimeout=5",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "mtm@night2.lan",
-                "echo test",
-            ],
-            capture_output=True,
-        )
-
-        if ssh_test.returncode != 0:
-            pytest.skip("SSH to mtm@night2.lan failed")
-
-        return True
-
-    @pytest.fixture
-    def temp_dir(self):
-        """Create test directory with playbook."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            playbook_dir = Path(temp_dir) / "playbooks"
-            playbook_dir.mkdir()
-
-            (playbook_dir / "venv_wrapper.yml").write_text(
-                """---
-- name: Test venv wrapper on remote host
-  hosts: "{{ target_host | default('night2.lan') }}"
-  remote_user: mtm
-  gather_facts: no
-  tasks:
-    - name: Test task on remote host
-      debug:
-        msg: "SSH test on {{ inventory_hostname }}"
-"""
-            )
-
-            yield str(temp_dir)
 
     @pytest.fixture
     def paths(self):
@@ -104,8 +43,60 @@ class TestVenvManagementSSH:
             "ssh_key": str(base / "keys" / "briefcase_test_key"),
         }
 
+    @pytest.fixture
+    def ssh_check(self, paths):
+        """Check SSH connectivity to night2.lan using ansible ping."""
+        result = subprocess.run(
+            [
+                "ansible",
+                "night2.lan",
+                "-i",
+                paths["inventory"],
+                "--private-key",
+                paths["ssh_key"],
+                "-u",
+                "mtm",
+                "-m",
+                "ping",
+            ],
+            capture_output=True,
+        )
+
+        if result.returncode != 0:
+            pytest.skip("Ansible ping to night2.lan failed")
+
+        return True
+
+    @pytest.fixture
+    def temp_dir(self):
+        """Create test directory with SSH playbook."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            playbook_dir = Path(temp_dir) / "playbooks"
+            playbook_dir.mkdir()
+
+            # Load test SSH playbook from disk
+            test_ssh_playbook_path = Path(__file__).parent / "test_ssh_playbook.yml"
+
+            # Create wrapper that uses include_tasks to load from the test file
+            wrapper_content = f"""---
+- name: Test venv wrapper on remote host via SSH
+  hosts: "{{{{ target_host | default('night2.lan') }}}}"
+  remote_user: mtm
+  connection: ssh
+  gather_facts: no
+  vars:
+    ansible_ssh_private_key_file: "{{{{ ssh_key_path }}}}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o ControlMaster=no'
+  tasks:
+    - name: Include SSH test tasks from file
+      include_tasks: {test_ssh_playbook_path}
+"""
+            (playbook_dir / "venv_wrapper.yml").write_text(wrapper_content)
+
+            yield str(temp_dir)
+
     def test_temporary_venv_no_name_ssh(self, ssh_check, temp_dir, paths):
-        """Test temporary venv via SSH."""
+        """Test temporary venv via SSH - confirms real remote execution."""
         result = run_playbook_with_venv(
             venv_wrapper_playbook_path=f"{temp_dir}/playbooks/venv_wrapper.yml",
             inventory_path=paths["inventory"],
@@ -159,6 +150,9 @@ class TestVenvManagementSSH:
 - name: Broken playbook
   hosts: night2.lan
   remote_user: mtm
+  connection: ssh
+  vars:
+    ansible_ssh_private_key_file: "{{ ssh_key_path }}"
   tasks:
     - name: Fail task
       fail:

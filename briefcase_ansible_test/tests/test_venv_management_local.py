@@ -5,34 +5,51 @@ Local tests for venv_management executor.py functions using real Ansible.
 Tests the same 4 core scenarios as test_venv_executor.py but with real
 execution instead of mocks.
 """
+# flake8: noqa: E402
 
 import sys
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
-
-# Import the main function we'll test
-from briefcase_ansible_test.ansible.venv_management.executor import (
-    run_playbook_with_venv,
-)
-from briefcase_ansible_test.ansible.venv_management.metadata import (
-    save_venv_metadata,
-    load_venv_metadata,
-)
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-# Mock iOS dependencies before importing, but NOT multiprocessing for local tests
-sys.modules["rubicon"] = MagicMock()
-sys.modules["rubicon.objc"] = MagicMock()
-# Don't mock ios_multiprocessing - we want real multiprocessing for local tests
+import pytest
+
+from briefcase_ansible_test.ansible.venv_management.executor import (
+    run_playbook_with_venv,
+)
+from briefcase_ansible_test.ansible.venv_management.metadata import (
+    load_venv_metadata,
+    save_venv_metadata,
+)
 
 
 class TestVenvManagementLocal:
     """Test executor.py functions with real Ansible execution - no mocks."""
+
+    @pytest.fixture(autouse=True)
+    def reset_ansible_context(self):
+        """Reset Ansible context between tests to avoid state pollution."""
+        # Import here to ensure it's available
+        from ansible import context
+        from ansible.module_utils.common.collections import ImmutableDict
+
+        # Clear extra_vars before each test if context exists
+        if hasattr(context, "CLIARGS") and context.CLIARGS:
+            current_args = dict(context.CLIARGS)
+            if "extra_vars" in current_args:
+                current_args["extra_vars"] = []
+                context.CLIARGS = ImmutableDict(current_args)
+
+        yield
+
+        # Clear extra_vars after each test if context exists
+        if hasattr(context, "CLIARGS") and context.CLIARGS:
+            current_args = dict(context.CLIARGS)
+            if "extra_vars" in current_args:
+                current_args["extra_vars"] = []
+                context.CLIARGS = ImmutableDict(current_args)
 
     @pytest.fixture
     def temp_dir(self):

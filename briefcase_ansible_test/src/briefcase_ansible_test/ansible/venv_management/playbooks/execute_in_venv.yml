@@ -3,35 +3,38 @@
 - name: Execute playbook in virtual environment
   delegate_to: "{{ target_host }}"
   block:
-    - name: Copy playbook to target if needed
+    - name: Create playbooks directory in venv
+      file:
+        path: "{{ actual_venv_path }}/playbooks"
+        state: directory
+        mode: '0755'
+      when: playbook_to_run is defined
+
+    - name: Copy playbook to venv playbooks directory
       copy:
         src: "{{ playbook_to_run }}"
-        dest: "/tmp/{{ playbook_to_run | basename }}"
-      when: playbook_to_run is not match('^/')
+        dest: "{{ actual_venv_path }}/playbooks/{{ playbook_to_run | basename }}"
+        mode: '0644'
+      when: playbook_to_run is defined
       register: copied_playbook
 
-    - name: Set playbook path
+    - name: Set playbook path within venv
       set_fact:
-        remote_playbook_path: "{{ copied_playbook.dest | default(playbook_to_run) }}"
+        remote_playbook_path: "{{ actual_venv_path }}/playbooks/{{ playbook_to_run | basename }}"
 
-    - name: Prepare ansible-playbook command
-      set_fact:
-        ansible_command: |
-          source {{ actual_venv_path }}/bin/activate
-          ansible-playbook {{ remote_playbook_path }} \
-            -i localhost, \
-            -c local \
-            {% if extra_playbook_vars is defined %}
-            {% for key, value in extra_playbook_vars.items() %}
-            -e "{{ key }}={{ value }}" \
-            {% endfor %}
-            {% endif %}
-            {% if ansible_verbosity is defined %}
-            -{{ 'v' * ansible_verbosity }}
-            {% endif %}
+    - name: Debug ansible command
+      debug:
+        msg: "Executing: {{ actual_venv_path }}/bin/ansible-playbook {{ remote_playbook_path }} -i localhost, -c local"
 
     - name: Execute playbook
-      shell: "{{ ansible_command }}"
+      command:
+        argv:
+          - "{{ actual_venv_path }}/bin/ansible-playbook"
+          - "{{ remote_playbook_path }}"
+          - "-i"
+          - "localhost,"
+          - "-c"
+          - "local"
       environment: "{{ playbook_environment | default({}) | combine({'ANSIBLE_COLLECTIONS_PATH': actual_venv_path + '/ansible_collections'}) }}"
       register: playbook_output
 

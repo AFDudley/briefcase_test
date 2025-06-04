@@ -10,8 +10,6 @@ from .metadata import load_venv_metadata, save_venv_metadata
 
 # Imports at module level - no lazy imports
 from ansible.parsing.dataloader import DataLoader
-from ansible.inventory.manager import InventoryManager
-from ansible.vars.manager import VariableManager
 from ansible.playbook.play import Play
 from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible import context
@@ -100,6 +98,7 @@ def create_ansible_context(target_host: str, ssh_key_path: str) -> Dict[str, Any
         "verbosity": 0,
         "host_key_checking": False,
         "ssh_common_args": f"-i {ssh_key_path}" if target_host != "localhost" else "",
+        "collections_path": [],  # Let Ansible use default collection paths
     }
 
 
@@ -161,25 +160,39 @@ def run_playbook_with_venv(
         extra_vars=extra_vars,
     )
 
+    # Add ssh_key_path to wrapper_vars for playbook use
+    wrapper_vars["ssh_key_path"] = ssh_key_path
+
     # Execute the wrapper playbook directly using execute_play_with_timeout
     # Create data loader and load playbook - let errors propagate
+    import os
+    import json
+    from ..ansible_config import (
+        configure_ansible_context,
+        initialize_plugin_loader,
+        setup_ansible_inventory,
+    )
+
+    # Initialize Ansible plugin loading
+    initialize_plugin_loader(lambda x: None)  # Dummy output callback
+
+    # Configure Ansible context
+    configure_ansible_context(
+        ssh_key_path, "ssh" if target_host != "localhost" else "local"
+    )
+
+    # Add extra vars to context
+    current_args = dict(context.CLIARGS)
+    current_args["extra_vars"] = [json.dumps(wrapper_vars)]
+    context.CLIARGS = ImmutableDict(current_args)
+
+    playbook_dir = os.path.dirname(os.path.abspath(venv_wrapper_playbook_path))
     loader = DataLoader()
+    loader.set_basedir(playbook_dir)  # Set the base directory for relative paths
     playbook_data = loader.load_from_file(venv_wrapper_playbook_path)
 
-    # Setup inventory
-    inventory = InventoryManager(loader=loader, sources=[inventory_path])
-
-    # Configure context with extra vars
-    ansible_context = create_ansible_context(target_host, ssh_key_path)
-    # Convert wrapper_vars to the format expected by Ansible's extra_vars
-    # Ansible expects extra_vars as a list of strings or files
-    import json
-
-    ansible_context["extra_vars"] = [json.dumps(wrapper_vars)]
-    context.CLIARGS = ImmutableDict(ansible_context)
-
-    # Setup variable manager (it will automatically load extra_vars from context)
-    variable_manager = VariableManager(loader=loader, inventory=inventory)
+    # Setup inventory and variable manager using existing functions
+    inventory, variable_manager = setup_ansible_inventory(inventory_path, loader)
 
     # Create play from playbook
     play_data = playbook_data[0] if isinstance(playbook_data, list) else playbook_data
@@ -201,8 +214,8 @@ def run_playbook_with_venv(
         success = result_code == 0
         metadata = None
 
-        # Save metadata if successful
-        if success:
+        # Save metadata if successful AND persistent
+        if success and persist:
             metadata = create_default_metadata(wrapper_vars)
             save_venv_metadata(metadata_dir_path, actual_venv_name, metadata)
             messages.append(f"Metadata saved for venv '{actual_venv_name}'")

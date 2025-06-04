@@ -1,16 +1,33 @@
 ---
 # Main tasks for venv_executor role
 
-- name: Ensure Python3 and venv module are available
-  package:
-    name: "{{ item }}"
-    state: present
-  loop:
-    - python3
-    - python3-venv
-    - python3-pip
-  become: "{{ require_sudo }}"
-  when: ensure_system_packages | default(true)
+- name: Check if python3 is available
+  command: python3 --version
+  register: python3_check
+  failed_when: python3_check.rc != 0
+  changed_when: false
+
+- name: Check if python3 venv module is available
+  command: python3 -m venv --help
+  register: venv_check
+  failed_when: venv_check.rc != 0
+  changed_when: false
+
+- name: Check if pip is available
+  command: python3 -m pip --version
+  register: pip_check
+  failed_when: pip_check.rc != 0
+  changed_when: false
+
+- name: Fail if required packages are missing
+  fail:
+    msg: |
+      Required system packages are missing. Please install:
+      - python3: {{ 'OK' if python3_check.rc == 0 else 'MISSING' }}
+      - python3-venv: {{ 'OK' if venv_check.rc == 0 else 'MISSING' }}
+      - python3-pip: {{ 'OK' if pip_check.rc == 0 else 'MISSING' }}
+      Install these packages using your system package manager before running this role.
+  when: python3_check.rc != 0 or venv_check.rc != 0 or pip_check.rc != 0
 
 - name: Create venv directory if persistent
   file:
@@ -27,28 +44,23 @@
   register: venv_created
 
 - name: Upgrade pip if requested
-  pip:
-    name: pip
-    state: latest
-    virtualenv: "{{ venv_path }}"
-  when: upgrade_pip
-  async: "{{ install_timeout }}"
+  shell: |
+    . {{ venv_path }}/bin/activate && pip install --upgrade pip
+  when: upgrade_pip | default(false)
+  async: "{{ install_timeout | default(300) }}"
   poll: 10
 
 - name: Install base Python packages
-  pip:
-    name: "{{ base_python_packages }}"
-    virtualenv: "{{ venv_path }}"
-    state: latest
-  async: "{{ install_timeout }}"
+  shell: |
+    . {{ venv_path }}/bin/activate && pip install {{ base_python_packages | default(['ansible-core']) | join(' ') }}
+  async: "{{ install_timeout | default(300) }}"
   poll: 10
 
 - name: Install additional Python packages
-  pip:
-    name: "{{ python_packages }}"
-    virtualenv: "{{ venv_path }}"
-  when: python_packages | length > 0
-  async: "{{ install_timeout }}"
+  shell: |
+    . {{ venv_path }}/bin/activate && pip install {{ python_packages | join(' ') }}
+  when: python_packages | default([]) | length > 0
+  async: "{{ install_timeout | default(300) }}"
   poll: 10
 
 - name: Create collections directory
@@ -60,8 +72,7 @@
 
 - name: Install Ansible collections
   shell: |
-    source {{ venv_path }}/bin/activate
-    ansible-galaxy collection install {{ item }} -p {{ collection_install_path }}
+    . {{ venv_path }}/bin/activate && ansible-galaxy collection install {{ item }} -p {{ collection_install_path }}
   loop: "{{ ansible_collections }}"
   when: ansible_collections | length > 0
   environment:
@@ -71,8 +82,7 @@
 
 - name: Verify venv is functional
   shell: |
-    source {{ venv_path }}/bin/activate
-    python --version && ansible --version
+    . {{ venv_path }}/bin/activate && python --version && ansible --version
   register: venv_verify
   changed_when: false
 

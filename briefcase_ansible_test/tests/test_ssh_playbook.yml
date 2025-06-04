@@ -1,0 +1,23 @@
+---
+# Tasks file for SSH connection testing (not a full playbook)
+- name: Get current user
+  command: whoami
+  register: whoami_result
+  changed_when: false
+
+- name: Get hostname
+  command: hostname
+  register: hostname_result
+  changed_when: false
+
+- name: Get OS info
+  command: uname -s
+  register: os_result
+  changed_when: false
+
+- name: Display SSH connection success
+  debug:
+    msg: >-
+      SSH SUCCESS - User: {{ whoami_result.stdout | trim }},
+      Host: {{ hostname_result.stdout | trim }},
+      OS: {{ os_result.stdout | trim }}

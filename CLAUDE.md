@@ -128,3 +128,9 @@ Current debug points:
 - `ThreadProcess.start()` and `_run_wrapper()` methods
 - TQM.run() entry and exit
 - multiprocessing.Process verification before TQM execution
+
+## Commit Guidelines
+
+- Run pre-commit before committing. Every error and issue must be fixed before committing. 
+- Ignoring errors can only be considered as a last resort after every other option has been explored. 
+- If unsure what to do, ask for guidance.

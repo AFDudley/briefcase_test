@@ -5,22 +5,19 @@
   block:
     - name: Get pip freeze output
       shell: |
-        source {{ actual_venv_path }}/bin/activate
-        pip freeze
+        . {{ actual_venv_path }}/bin/activate && pip freeze
       register: pip_freeze_output
       changed_when: false
 
     - name: Get ansible version
       shell: |
-        source {{ actual_venv_path }}/bin/activate
-        ansible --version
+        . {{ actual_venv_path }}/bin/activate && ansible --version
       register: ansible_version_output
       changed_when: false
 
     - name: List installed collections
       shell: |
-        source {{ actual_venv_path }}/bin/activate
-        ansible-galaxy collection list --format json 2>/dev/null || echo '{}'
+        . {{ actual_venv_path }}/bin/activate && ansible-galaxy collection list --format json 2>/dev/null || echo '{}'
       register: collections_output
       changed_when: false
 
@@ -38,18 +35,23 @@
 
     - name: Create metadata structure
       set_fact:
-        venv_metadata:
-          venv_name: "{{ venv_name }}"
-          venv_path: "{{ actual_venv_path }}"
-          created_at: "{{ ansible_date_time.iso8601 }}"
-          target_host: "{{ target_host }}"
-          persistent: "{{ persist_venv }}"
-          python_version: "{{ python_version_output.stdout }}"
-          ansible_version: "{{ ansible_version_output.stdout_lines }}"
+        collected_metadata:
+          python_version: "{{ python_version_output.stdout | trim }}"
+          ansible_version: "{{ ansible_version_output.stdout_lines[0] | trim if ansible_version_output.stdout_lines else 'unknown' }}"
+          venv_size: "{{ venv_size_output.stdout | trim }}"
+          package_count: "{{ pip_freeze_output.stdout_lines | length }}"
           pip_packages: "{{ pip_freeze_output.stdout_lines }}"
-          ansible_collections: "{{ collections_output.stdout | from_json }}"
-          venv_size: "{{ venv_size_output.stdout }}"
 
-    - name: Return metadata to iOS app
+    - name: Display collected metadata
       debug:
-        var: venv_metadata
+        msg:
+          - "=== Virtual Environment Metadata ==="
+          - "Python: {{ collected_metadata.python_version }}"
+          - "Ansible: {{ collected_metadata.ansible_version }}"
+          - "Size: {{ collected_metadata.venv_size }}"
+          - "Packages: {{ collected_metadata.package_count }}"
+          - "=== Collection Complete ==="
+
+    - name: Store metadata for retrieval
+      set_fact:
+        venv_metadata_result: "{{ collected_metadata }}"

@@ -1,9 +1,24 @@
 ---
 # Main wrapper playbook for virtual environment management
 - name: Execute playbook via virtual environment
-  hosts: localhost
-  gather_facts: no
+  hosts: "{{ target_host | default('localhost') }}"
+  remote_user: "{{ ansible_user | default('ansible_default_user') }}"
+  connection: "{{ 'ssh' if target_host is defined and target_host != 'localhost' else 'local' }}"
+  gather_facts: yes
   vars:
+    ansible_ssh_private_key_file: "{{ ssh_key_path | default(omit) }}"
+    ansible_ssh_common_args: >-
+      {{
+        [
+          '-o', 'StrictHostKeyChecking=no',
+          '-o', 'UserKnownHostsFile=/dev/null',
+          '-o', 'ControlMaster=no',
+          '-o', 'ControlPersist=0',
+          '-o', 'ServerAliveInterval=0',
+          '-o', 'ServerAliveCountMax=1',
+          '-o', 'ConnectTimeout=10'
+        ] | join(' ') if target_host is defined and target_host != 'localhost' else omit
+      }}
     # Determine actual venv path based on persistence
     actual_venv_path: "{{ persistent_venv_path if persist_venv else temp_venv_path }}"
     temp_venv_path: "/tmp/ansible-venv-{{ venv_name | default(ansible_date_time.epoch) }}"
@@ -24,8 +39,7 @@
 
     - name: Setup virtual environment
       include_role:
-        name: venv_executor
-      delegate_to: "{{ target_host }}"
+        name: ../roles/venv_executor
       vars:
         venv_path: "{{ actual_venv_path }}"
         venv_action: "setup"
