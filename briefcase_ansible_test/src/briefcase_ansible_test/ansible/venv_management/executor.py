@@ -7,14 +7,24 @@ import time
 from typing import Dict, Any, Optional, List
 from functools import partial
 
-from ..playbook import run_ansible_playbook as run_playbook_internal
 from .metadata import load_venv_metadata, save_venv_metadata
+
+# Imports at module level - no lazy imports
+from ansible.parsing.dataloader import DataLoader
+from ansible.inventory.manager import InventoryManager
+from ansible.vars.manager import VariableManager
+from ansible.playbook.play import Play
+from ansible.executor.task_queue_manager import TaskQueueManager
+from ansible import context
+from ansible.module_utils.common.collections import ImmutableDict
+from ..callbacks import SimpleCallback
+from ..play_executor import execute_play_with_timeout
 
 
 def get_venv_path(venv_name: str, target_host: str, persist: bool = False) -> str:
     """
     Generate the virtual environment path based on persistence setting.
-    
+
     For persistent venvs, uses ~/ansible-venvs/<name>
     For temporary venvs, uses /tmp/ansible-venv-<name>
     """
@@ -31,16 +41,16 @@ def create_venv_vars(
     collections: Optional[List[str]] = None,
     python_packages: Optional[List[str]] = None,
     playbook_path: Optional[str] = None,
-    extra_vars: Optional[Dict[str, Any]] = None
+    extra_vars: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Create variables dict for venv wrapper playbook.
-    
+
     This is a pure function that generates the configuration needed
     for the venv management playbook.
     """
     venv_path = get_venv_path(venv_name, target_host, persist)
-    
+
     base_vars = {
         "venv_name": venv_name,
         "venv_path": venv_path,
@@ -50,31 +60,14 @@ def create_venv_vars(
         "ansible_collections": collections or [],
         "python_packages": python_packages or ["ansible-core"],
     }
-    
+
     if playbook_path:
         base_vars["playbook_to_run"] = playbook_path
-        
+
     if extra_vars:
         base_vars.update(extra_vars)
-        
+
     return base_vars
-
-
-def check_venv_exists(app_paths, venv_name: str, target_host: str) -> Optional[Dict[str, Any]]:
-    """
-    Check if a virtual environment exists by looking up its metadata.
-    
-    Returns metadata dict if exists, None otherwise.
-    """
-    return load_venv_metadata(app_paths, venv_name, target_host)
-
-
-def format_existing_venv_message(metadata: Dict[str, Any]) -> str:
-    """Format a message about an existing venv."""
-    return (
-        f"Using existing venv '{metadata['venv_name']}' "
-        f"created at {metadata['created_at']}"
-    )
 
 
 def generate_temp_venv_name() -> str:
@@ -82,54 +75,100 @@ def generate_temp_venv_name() -> str:
     return f"temp_{int(time.time())}"
 
 
-def extract_metadata_from_result(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Extract venv metadata from playbook execution result."""
-    return result.get("venv_metadata") if result.get("success") else None
+def create_ansible_context(target_host: str, ssh_key_path: str) -> ImmutableDict:
+    """Create Ansible context configuration - pure function."""
+    return ImmutableDict(
+        connection="ssh" if target_host != "localhost" else "local",
+        module_path=[],
+        forks=1,
+        become=None,
+        become_method=None,
+        become_user=None,
+        check=False,
+        diff=False,
+        verbosity=0,
+        host_key_checking=False,
+        ssh_common_args=f"-i {ssh_key_path}" if target_host != "localhost" else "",
+    )
+
+
+def create_default_metadata(wrapper_vars: Dict[str, Any]) -> Dict[str, Any]:
+    """Create default metadata structure - pure function."""
+    return {
+        "venv_name": wrapper_vars.get("venv_name"),
+        "venv_path": wrapper_vars.get("venv_path"),
+        "target_host": wrapper_vars.get("target_host"),
+        "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "persistent": wrapper_vars.get("persist_venv", False),
+    }
 
 
 def run_venv_wrapper_playbook(
-    app,
-    wrapper_vars: Dict[str, Any],
-    ui_updater
+    app, wrapper_vars: Dict[str, Any], ui_updater
 ) -> Dict[str, Any]:
     """
     Execute the venv wrapper playbook and return results.
-    
-    This is a thin wrapper around the internal playbook runner
-    that knows about the venv wrapper playbook location.
+
+    Follows functional programming principles with no error hiding.
     """
-    wrapper_playbook = os.path.join(
-        app.paths.app, 
-        "ansible", 
-        "venv_management", 
-        "playbooks", 
-        "venv_wrapper.yml"
+    # Build paths inline
+    playbook_path = os.path.join(
+        app.paths.app, "ansible", "venv_management", "playbooks", "venv_wrapper.yml"
     )
-    
-    # Create a custom callback to capture metadata
-    class MetadataCapture:
-        def __init__(self):
-            self.metadata = None
-            
-        def capture(self, task_name: str, result: Any):
-            if task_name == "Return metadata to iOS app":
-                self.metadata = result
-    
-    capture = MetadataCapture()
-    
-    # Run the playbook
-    result = run_playbook_internal(
-        app,
-        wrapper_playbook,
-        extra_vars=wrapper_vars,
-        result_callback=capture.capture
+    inventory_path = os.path.join(
+        app.paths.app, "resources", "inventory", "sample_inventory.ini"
     )
-    
-    return {
-        "success": result == 0,
-        "venv_metadata": capture.metadata,
-        "result_code": result
-    }
+    ssh_key_path = os.path.join(
+        app.paths.app, "resources", "keys", "briefcase_test_key"
+    )
+
+    # Create data loader and load playbook - let errors propagate
+    loader = DataLoader()
+    playbook_data = loader.load_from_file(playbook_path)
+
+    # Setup inventory
+    inventory = InventoryManager(loader=loader, sources=[inventory_path])
+
+    # Setup variable manager
+    variable_manager = VariableManager(loader=loader, inventory=inventory)
+    variable_manager.extra_vars = wrapper_vars
+
+    # Configure context
+    target_host = wrapper_vars.get("target_host", "localhost")
+    context.CLIARGS = create_ansible_context(target_host, ssh_key_path)
+
+    # Create play from playbook
+    play_data = playbook_data[0] if isinstance(playbook_data, list) else playbook_data
+    play = Play().load(play_data, variable_manager=variable_manager, loader=loader)
+
+    # Create callback
+    callback = SimpleCallback(ui_updater)
+
+    # Execute play
+    tqm = None
+    try:
+        tqm = TaskQueueManager(
+            inventory=inventory,
+            variable_manager=variable_manager,
+            loader=loader,
+            passwords={},
+            stdout_callback=callback,
+        )
+
+        result = execute_play_with_timeout(
+            tqm, play, ui_updater.add_text_to_output, timeout=300
+        )
+
+        # Return result structure
+        return {
+            "success": result == 0,
+            "venv_metadata": create_default_metadata(wrapper_vars),
+            "result_code": result,
+        }
+
+    finally:
+        if tqm is not None:
+            tqm.cleanup()
 
 
 def run_playbook_with_venv(
@@ -141,25 +180,26 @@ def run_playbook_with_venv(
     collections: Optional[List[str]] = None,
     python_packages: Optional[List[str]] = None,
     extra_vars: Optional[Dict[str, Any]] = None,
-    ui_updater = None
+    ui_updater=None,
 ) -> bool:
     """
     Run a playbook using a virtual environment on the target host.
-    
+
     This is the main entry point for venv-based playbook execution.
     Returns True if successful, False otherwise.
     """
     # Generate venv name if not provided
     actual_venv_name = venv_name or generate_temp_venv_name()
-    
+
     # Check for existing venv if persistent
     if persist and venv_name:
-        existing = check_venv_exists(app.paths, actual_venv_name, target_host)
+        existing = load_venv_metadata(app.paths, actual_venv_name, target_host)
         if existing and ui_updater:
             ui_updater.add_text_to_output(
-                format_existing_venv_message(existing) + "\n"
+                f"Using existing venv '{existing['venv_name']}' "
+                f"created at {existing['created_at']}\n"
             )
-    
+
     # Create wrapper variables
     wrapper_vars = create_venv_vars(
         venv_name=actual_venv_name,
@@ -168,22 +208,22 @@ def run_playbook_with_venv(
         collections=collections,
         python_packages=python_packages,
         playbook_path=playbook_path,
-        extra_vars=extra_vars
+        extra_vars=extra_vars,
     )
-    
+
     # Execute the wrapper playbook
     result = run_venv_wrapper_playbook(app, wrapper_vars, ui_updater)
-    
+
     # Save metadata if successful
     if result["success"]:
-        metadata = extract_metadata_from_result(result)
+        metadata = result.get("venv_metadata") if result.get("success") else None
         if metadata:
             save_venv_metadata(app.paths, actual_venv_name, metadata)
             if ui_updater:
                 ui_updater.add_text_to_output(
                     f"✅ Metadata saved for venv '{actual_venv_name}'\n"
                 )
-    
+
     return result["success"]
 
 

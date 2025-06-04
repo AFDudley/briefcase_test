@@ -3,19 +3,26 @@ A simple app to parse and display Ansible inventory using Ansible's InventoryMan
 """
 
 # Standard library imports
-
 import asyncio
 
 # Third-party imports
 import toga
 
 # Local application imports
-from briefcase_ansible_test.ssh_utils import test_ssh_connection, generate_ed25519_key, test_ssh_connection_with_generated_key
+from briefcase_ansible_test.ssh_utils import generate_ed25519_key
 from briefcase_ansible_test.ui import BackgroundTaskRunner, UIComponents, UIUpdater
 from briefcase_ansible_test.utils.logging import setup_app_logging, AppLogger
 from briefcase_ansible_test.ansible.ping import ansible_ping_test
-from briefcase_ansible_test.ansible.droplet_management import run_droplet_playbook
-from briefcase_ansible_test.utils.data_processing import create_button_configs, ButtonConfig
+from briefcase_ansible_test.utils.data_processing import (
+    create_button_configs,
+    ButtonConfig,
+)
+from briefcase_ansible_test.ansible.venv_management.tests import (
+    test_temp_venv_playbook,
+    test_create_venv,
+    test_list_venvs,
+    test_delete_venv,
+)
 
 
 class BriefcaseAnsibleTest(toga.App):
@@ -26,7 +33,9 @@ class BriefcaseAnsibleTest(toga.App):
         self.background_tasks = set()
         self.app_logger = None
 
-    def _create_button_callbacks(self, button_configs: list[ButtonConfig]) -> list[tuple]:
+    def _create_button_callbacks(
+        self, button_configs: list[ButtonConfig]
+    ) -> list[tuple]:
         """Map button configurations to actual callbacks.
 
         This method creates the actual callbacks from configuration data,
@@ -34,22 +43,16 @@ class BriefcaseAnsibleTest(toga.App):
         """
         callback_map = {
             "ansible_ping_test": lambda widget: ansible_ping_test(self, widget),
-            "test_ssh_connection": lambda widget: self.background_task_runner.run_task(
-                lambda: test_ssh_connection(ui_updater=self.ui_updater),
-                "Testing SSH Connection with ed25519...",
-            ),
             "generate_ed25519_key": lambda widget: self.background_task_runner.run_task(
                 lambda: generate_ed25519_key(self.paths.app, self.ui_updater),
                 "Generating ED25519 key...",
             ),
-            "test_ssh_connection_generated": lambda widget: self.background_task_runner.run_task(
-                lambda: test_ssh_connection_with_generated_key(self.paths, self.ui_updater),
-                "Testing SSH Connection with generated key...",
+            "test_temp_venv_playbook": lambda widget: test_temp_venv_playbook(
+                self, widget
             ),
-            "run_droplet_playbook": lambda widget: self.background_task_runner.run_task(
-                lambda: run_droplet_playbook(self.paths, self.ui_updater),
-                "Creating rtorrent droplet...",
-            ),
+            "test_create_venv": lambda widget: test_create_venv(self, widget),
+            "test_list_venvs": lambda widget: test_list_venvs(self, widget),
+            "test_delete_venv": lambda widget: test_delete_venv(self, widget),
         }
 
         return [
@@ -80,7 +83,10 @@ class BriefcaseAnsibleTest(toga.App):
 
         # Create UI updater and background task runner with logger
         self.ui_updater = UIUpdater(
-            self.output_view, self.status_label, self.main_event_loop, self.app_logger.logger
+            self.output_view,
+            self.status_label,
+            self.main_event_loop,
+            self.app_logger.logger,
         )
         self.background_task_runner = BackgroundTaskRunner(self.ui_updater)
 
@@ -100,6 +106,3 @@ class BriefcaseAnsibleTest(toga.App):
         self.main_window.content = main_box
         self.main_window.size = (600, 400)
         self.main_window.show()
-
-
-

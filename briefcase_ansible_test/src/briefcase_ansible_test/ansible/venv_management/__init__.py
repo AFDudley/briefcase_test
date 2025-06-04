@@ -9,13 +9,11 @@ from .metadata import (
     save_venv_metadata,
     load_venv_metadata,
     list_all_venvs,
-    get_venv_index,
-    update_venv_index,
+    delete_venv_metadata,
 )
 
 from .executor import (
     run_playbook_with_venv,
-    check_venv_exists,
     get_venv_path,
     create_venv_vars,
 )
@@ -31,11 +29,9 @@ __all__ = [
     "save_venv_metadata",
     "load_venv_metadata",
     "list_all_venvs",
-    "get_venv_index",
-    "update_venv_index",
+    "delete_venv_metadata",
     # Executor functions
     "run_playbook_with_venv",
-    "check_venv_exists",
     "get_venv_path",
     "create_venv_vars",
     # UI formatting functions
