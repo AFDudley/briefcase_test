@@ -104,10 +104,12 @@ def execute_play_with_timeout(tqm, play, output_callback, timeout=10):
     timeout_thread.join(timeout=timeout)
 
     if timeout_thread.is_alive():
-        output_callback(f"⚠️ TQM.run() timed out after {timeout} seconds\n")
+        if output_callback:
+            output_callback(f"⚠️ TQM.run() timed out after {timeout} seconds\n")
         return 1
     elif exception:
         raise exception
     else:
-        output_callback(f"Playbook completed with result: {result}\n")
+        if output_callback:
+            output_callback(f"Playbook completed with result: {result}\n")
         return result or 0

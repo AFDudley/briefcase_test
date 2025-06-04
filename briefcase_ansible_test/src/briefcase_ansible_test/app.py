@@ -17,7 +17,7 @@ from briefcase_ansible_test.utils.data_processing import (
     create_button_configs,
     ButtonConfig,
 )
-from briefcase_ansible_test.ansible.venv_management.tests import (
+from briefcase_ansible_test.ansible.venv_management.demo_functions import (
     test_temp_venv_playbook,
     test_create_venv,
     test_list_venvs,
