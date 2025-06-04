@@ -1,5 +1,5 @@
 """
-Functional utilities for managing virtual environment metadata.
+Metadata management for droplet resources.
 """
 
 import json
@@ -8,16 +8,16 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 
-def save_venv_metadata(
-    metadata_dir_path: str, venv_name: str, metadata: Dict[str, Any]
+def save_droplet_metadata(
+    metadata_dir_path: str, droplet_name: str, metadata: Dict[str, Any]
 ) -> str:
     """
-    Save virtual environment metadata to JSON file.
+    Save droplet metadata to JSON file.
 
     Returns the filepath where metadata was saved.
     """
     # Create metadata directory if needed
-    metadata_dir = os.path.join(metadata_dir_path, "resources", "venv_metadata")
+    metadata_dir = os.path.join(metadata_dir_path, "resources", "droplet_metadata")
     os.makedirs(metadata_dir, exist_ok=True)
 
     # Add timestamp and version
@@ -28,7 +28,7 @@ def save_venv_metadata(
     }
 
     # Save to file
-    filename = f"{venv_name}_{metadata['target_host']}.json"
+    filename = f"{droplet_name}.json"
     filepath = os.path.join(metadata_dir, filename)
 
     with open(filepath, "w") as f:
@@ -37,12 +37,12 @@ def save_venv_metadata(
     return filepath
 
 
-def load_venv_metadata(
-    metadata_dir_path: str, venv_name: str, target_host: str
+def load_droplet_metadata(
+    metadata_dir_path: str, droplet_name: str
 ) -> Optional[Dict[str, Any]]:
-    """Load metadata for a specific virtual environment."""
-    metadata_dir = os.path.join(metadata_dir_path, "resources", "venv_metadata")
-    filename = f"{venv_name}_{target_host}.json"
+    """Load metadata for a specific droplet."""
+    metadata_dir = os.path.join(metadata_dir_path, "resources", "droplet_metadata")
+    filename = f"{droplet_name}.json"
     filepath = os.path.join(metadata_dir, filename)
 
     if os.path.exists(filepath):
@@ -51,42 +51,40 @@ def load_venv_metadata(
     return None
 
 
-def list_all_venvs(metadata_dir_path: str) -> List[Dict[str, Any]]:
+def list_all_droplets(metadata_dir_path: str) -> List[Dict[str, Any]]:
     """
-    List all known virtual environments by scanning metadata files.
+    List all known droplets by scanning metadata files.
 
     Returns a list of metadata dicts.
     """
-    metadata_dir = os.path.join(metadata_dir_path, "resources", "venv_metadata")
+    metadata_dir = os.path.join(metadata_dir_path, "resources", "droplet_metadata")
 
     if not os.path.exists(metadata_dir):
         return []
 
-    venvs = []
+    droplets = []
     for filename in os.listdir(metadata_dir):
-        if filename.endswith(".json") and "_" in filename:
+        if filename.endswith(".json"):
             filepath = os.path.join(metadata_dir, filename)
             try:
                 with open(filepath, "r") as f:
                     metadata = json.load(f)
-                    venvs.append(metadata)
+                    droplets.append(metadata)
             except (json.JSONDecodeError, IOError):
                 # Skip corrupted files
                 pass
 
-    return venvs
+    return droplets
 
 
-def delete_venv_metadata(
-    metadata_dir_path: str, venv_name: str, target_host: str
-) -> bool:
+def delete_droplet_metadata(metadata_dir_path: str, droplet_name: str) -> bool:
     """
-    Delete metadata for a virtual environment.
+    Delete metadata for a droplet.
 
     Returns True if deleted, False if not found.
     """
-    metadata_dir = os.path.join(metadata_dir_path, "resources", "venv_metadata")
-    filename = f"{venv_name}_{target_host}.json"
+    metadata_dir = os.path.join(metadata_dir_path, "resources", "droplet_metadata")
+    filename = f"{droplet_name}.json"
     filepath = os.path.join(metadata_dir, filename)
 
     if os.path.exists(filepath):

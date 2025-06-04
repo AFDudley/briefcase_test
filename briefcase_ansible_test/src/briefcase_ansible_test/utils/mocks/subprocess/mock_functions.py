@@ -15,12 +15,6 @@ def setup_subprocess_mock():
     iOS doesn't support creating subprocesses, so we need to mock
     subprocess operations to avoid [Errno 45] Operation not supported.
     """
-    # Store original functions
-    original_popen = subprocess.Popen
-    original_run = subprocess.run
-    original_call = subprocess.call
-    original_check_call = subprocess.check_call
-    original_check_output = subprocess.check_output
 
     def mock_run(args, **kwargs):
         print(f"iOS_DEBUG: Mocked subprocess.run call: {args}")

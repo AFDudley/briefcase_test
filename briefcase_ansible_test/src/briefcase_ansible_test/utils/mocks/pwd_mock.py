@@ -19,7 +19,8 @@ class PwdModule:
 
     class Struct:
         """
-        A simple structure class that can be used to create objects with arbitrary attributes.
+        A simple structure class that can be used to create objects with
+        arbitrary attributes.
         """
 
         def __init__(self, **entries):

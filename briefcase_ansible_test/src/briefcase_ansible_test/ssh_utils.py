@@ -5,7 +5,6 @@ SSH utilities for briefcase_ansible_test
 import os
 import sys
 import types
-import traceback
 import inspect
 from contextlib import contextmanager
 
@@ -206,15 +205,15 @@ def test_ssh_connection(
 ):
     """Test SSH connection using Paramiko with an ED25519 key."""
     ui = ui_updater.add_text_to_output if ui_updater else lambda x: None
-    
+
     if not key_path:
         app_module_path = inspect.getfile(briefcase_ansible_test)
         app_dir = os.path.dirname(app_module_path)
         key_path = os.path.join(app_dir, "resources", "keys", "briefcase_test_key")
-    
+
     key = load_ssh_key(key_path)
     ui(f"Testing SSH connection to {hostname}:{port} as {username}...\n")
-    
+
     with ssh_client_context(hostname, username, port, pkey=key, timeout=5) as client:
         success, output, error = execute_ssh_command(client, "whoami")
         if success:
@@ -246,10 +245,10 @@ def create_ssh_directory(app_path):
 def generate_ed25519_key(app_path, ui_updater=None):
     """Generate a new ED25519 SSH key and save it to the app resources."""
     ui = ui_updater.add_text_to_output if ui_updater else lambda x: None
-    
+
     ui("Generating ED25519 key pair...\n")
     ssh_dir = create_ssh_directory(app_path)
-    
+
     # Generate and save private key
     private_key = ed25519.Ed25519PrivateKey.generate()
     private_key_openssh = private_key.private_bytes(
@@ -260,17 +259,20 @@ def generate_ed25519_key(app_path, ui_updater=None):
     private_key_path = os.path.join(ssh_dir, "id_ed25519")
     with open(private_key_path, "wb") as f:
         f.write(private_key_openssh)
-    
+
     # Generate and save public key
     pk = load_ssh_key(private_key_path)
     public_key_str = f"{pk.get_name()} {pk.get_base64()} ansible-briefcase-app"
     public_key_path = os.path.join(ssh_dir, "id_ed25519.pub")
     with open(public_key_path, "w") as f:
         f.write(public_key_str + "\n")
-    
-    ui(f"✅ Generated ED25519 key pair\nPrivate: {private_key_path}\nPublic: {public_key_path}\n")
+
+    ui(
+        f"✅ Generated ED25519 key pair\n"
+        f"Private: {private_key_path}\nPublic: {public_key_path}\n"
+    )
     ui(f"Public Key:\n{public_key_str}\n")
-    
+
     if ui_updater:
         ui_updater.update_status("Key Generated")
     return True, private_key_path, public_key_path, public_key_str
@@ -284,15 +286,21 @@ def test_ssh_connection_with_generated_key(app_paths, ui_updater):
     public_key_path = os.path.join(ssh_dir, "id_ed25519.pub")
 
     if not os.path.exists(private_key_path):
-        ui("No generated key found. Please generate a key first using 'Generate ED25519 Key' button.\n")
+        ui(
+            "No generated key found. Please generate a key first using "
+            "'Generate ED25519 Key' button.\n"
+        )
         return
 
     with open(public_key_path, "r") as f:
         public_key_str = f.read().strip()
     ui(f"Using generated ed25519 public key:\n{public_key_str}\n")
-    ui("Make sure this key is added to ~/.ssh/authorized_keys for user 'mtm' on night2.lan\n")
+    ui(
+        "Make sure this key is added to ~/.ssh/authorized_keys for user "
+        "'mtm' on night2.lan\n"
+    )
 
-    success = test_ssh_connection("night2.lan", "mtm", key_path=private_key_path, ui_updater=ui_updater)
+    success = test_ssh_connection(
+        "night2.lan", "mtm", key_path=private_key_path, ui_updater=ui_updater
+    )
     ui(f"Generated key SSH connection test {'complete' if success else 'failed'}.\n")
-
-

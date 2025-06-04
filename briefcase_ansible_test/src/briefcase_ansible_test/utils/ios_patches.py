@@ -25,6 +25,7 @@ def setup_multiprocessing_mock():
 
     Uses the external ios-multiprocessing package instead of bundled version.
     """
-    # Import external ios-multiprocessing package  
+    # Import external ios-multiprocessing package
     import ios_multiprocessing
+
     ios_multiprocessing.patch_system_modules()

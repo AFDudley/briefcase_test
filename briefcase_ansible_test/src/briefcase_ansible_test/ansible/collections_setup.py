@@ -56,8 +56,11 @@ def setup_ansible_collections():
 
         # Store original if not already stored
         if not hasattr(collection_finder, "_original_get_collection_metadata"):
-            setattr(collection_finder, "_original_get_collection_metadata", 
-                    _get_collection_metadata)
+            setattr(
+                collection_finder,
+                "_original_get_collection_metadata",
+                _get_collection_metadata,
+            )
 
         # Mock metadata for ansible.builtin
         def mock_get_collection_metadata(collection_name):
@@ -70,7 +73,9 @@ def setup_ansible_collections():
                     "description": "Ansible builtin collection",
                 }
             # Fall back to original for other collections
-            original_func = getattr(collection_finder, "_original_get_collection_metadata", None)
+            original_func = getattr(
+                collection_finder, "_original_get_collection_metadata", None
+            )
             if original_func:
                 return original_func(collection_name)
             return None

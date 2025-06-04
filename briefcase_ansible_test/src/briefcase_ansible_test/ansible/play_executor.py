@@ -8,10 +8,6 @@ import os
 import threading
 import traceback
 from ansible.playbook.play import Play
-from ansible.executor.task_queue_manager import TaskQueueManager
-from briefcase_ansible_test.utils.data_processing import build_ansible_play_dict
-
-
 
 
 def load_play(play_source, variable_manager, loader, output_callback):
@@ -36,8 +32,10 @@ def load_play(play_source, variable_manager, loader, output_callback):
 
         # Debug play details
         output_callback(f"Play hosts: {play.hosts}\n")
-        tasks = play.tasks if hasattr(play, 'tasks') else []
-        output_callback(f"Play tasks: {len(tasks) if tasks else 0}\n")
+        tasks = getattr(play, "tasks", [])
+        if not isinstance(tasks, list):
+            tasks = []
+        output_callback(f"Play tasks: {len(tasks)}\n")
         for i, task_block in enumerate(tasks):
             output_callback(f"  Block {i}: {task_block}\n")
             if hasattr(task_block, "block"):

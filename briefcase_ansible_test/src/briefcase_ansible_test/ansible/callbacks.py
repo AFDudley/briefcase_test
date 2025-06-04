@@ -60,5 +60,6 @@ class SimpleCallback(CallbackBase):
         for host in hosts:
             s = stats.summarize(host)
             self.output_callback(
-                f"  {host}: ok={s['ok']}, changed={s['changed']}, unreachable={s['unreachable']}, failed={s['failures']}\n"
+                f"  {host}: ok={s['ok']}, changed={s['changed']}, "
+                f"unreachable={s['unreachable']}, failed={s['failures']}\n"
             )

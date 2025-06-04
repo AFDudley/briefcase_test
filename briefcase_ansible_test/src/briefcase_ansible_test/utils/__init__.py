@@ -1,7 +1,8 @@
 """
 Utility modules for briefcase_ansible_test.
 
-This package contains various utility modules for the briefcase_ansible_test application.
+This package contains various utility modules for the
+briefcase_ansible_test application.
 """
 
 # Core utilities

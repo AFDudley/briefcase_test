@@ -7,7 +7,7 @@ including directory access checks and temporary directory configuration.
 
 import os
 import tempfile
-from ansible import constants as C
+import ansible.constants
 
 
 def check_multiprocessing_availability(output_callback):
@@ -44,7 +44,8 @@ def find_writable_directory(app):
         app: The application instance
 
     Returns:
-        tuple: (writable_dir, test_results) where test_results is a list of (dir, success, error) tuples
+        tuple: (writable_dir, test_results) where test_results is a list
+               of (dir, success, error) tuples
     """
     test_results = []
     home_dir = os.path.expanduser("~")
@@ -109,10 +110,10 @@ def setup_ansible_temp_directory(writable_dir, output_callback):
 
         # Configure Ansible to use our writable directory
         # Set the temporary directory paths (these constants might not exist)
-        if hasattr(C, 'DEFAULT_LOCAL_TMP'):
-            C.DEFAULT_LOCAL_TMP = ansible_tmp_dir
-        if hasattr(C, 'DEFAULT_REMOTE_TMP'):
-            C.DEFAULT_REMOTE_TMP = ansible_tmp_dir
+        if hasattr(ansible.constants, "DEFAULT_LOCAL_TMP"):
+            setattr(ansible.constants, "DEFAULT_LOCAL_TMP", ansible_tmp_dir)
+        if hasattr(ansible.constants, "DEFAULT_REMOTE_TMP"):
+            setattr(ansible.constants, "DEFAULT_REMOTE_TMP", ansible_tmp_dir)
 
         # Also set environment variables as fallback
         os.environ["ANSIBLE_LOCAL_TEMP"] = ansible_tmp_dir

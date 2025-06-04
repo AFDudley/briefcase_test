@@ -2,10 +2,8 @@
 Functional utilities for executing playbooks with virtual environments.
 """
 
-import os
 import time
 from typing import Dict, Any, Optional, List
-from functools import partial
 from dataclasses import dataclass
 
 from .metadata import load_venv_metadata, save_venv_metadata
@@ -24,7 +22,7 @@ from ..play_executor import execute_play_with_timeout
 @dataclass(frozen=True)
 class VenvExecutionResult:
     """Immutable result of venv-based playbook execution."""
-    
+
     success: bool
     result_code: int
     venv_name: str
@@ -116,8 +114,6 @@ def create_default_metadata(wrapper_vars: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-
-
 def run_playbook_with_venv(
     venv_wrapper_playbook_path: str,
     inventory_path: str,
@@ -138,16 +134,21 @@ def run_playbook_with_venv(
     Returns VenvExecutionResult with all execution details.
     """
     messages = []
-    
+
     # Generate venv name if not provided
     actual_venv_name = venv_name or generate_temp_venv_name()
 
     # Check for existing venv if persistent
     existing_metadata = None
     if persist and venv_name:
-        existing_metadata = load_venv_metadata(metadata_dir_path, actual_venv_name, target_host)
+        existing_metadata = load_venv_metadata(
+            metadata_dir_path, actual_venv_name, target_host
+        )
         if existing_metadata:
-            messages.append(f"Using existing venv '{existing_metadata['venv_name']}' created at {existing_metadata['created_at']}")
+            messages.append(
+                f"Using existing venv '{existing_metadata['venv_name']}' "
+                f"created at {existing_metadata['created_at']}"
+            )
 
     # Create wrapper variables
     wrapper_vars = create_venv_vars(
@@ -173,7 +174,8 @@ def run_playbook_with_venv(
     # Convert wrapper_vars to the format expected by Ansible's extra_vars
     # Ansible expects extra_vars as a list of strings or files
     import json
-    ansible_context['extra_vars'] = [json.dumps(wrapper_vars)]
+
+    ansible_context["extra_vars"] = [json.dumps(wrapper_vars)]
     context.CLIARGS = ImmutableDict(ansible_context)
 
     # Setup variable manager (it will automatically load extra_vars from context)
@@ -194,9 +196,7 @@ def run_playbook_with_venv(
             stdout_callback=None,  # Use default, no UI callbacks
         )
 
-        result_code = execute_play_with_timeout(
-            tqm, play, None, timeout=300
-        )
+        result_code = execute_play_with_timeout(tqm, play, None, timeout=300)
 
         success = result_code == 0
         metadata = None
@@ -213,7 +213,7 @@ def run_playbook_with_venv(
             venv_metadata=metadata,
             messages=messages,
             venv_name=actual_venv_name,
-            existing_metadata=existing_metadata
+            existing_metadata=existing_metadata,
         )
 
     finally:

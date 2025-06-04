@@ -5,13 +5,16 @@ This module provides functions to configure Ansible context and settings.
 """
 
 from contextlib import contextmanager
+from typing import Optional
 
 from ansible.module_utils.common.collections import ImmutableDict
 from ansible import context
 from ansible.plugins.loader import init_plugin_loader
 
 
-def configure_ansible_context(key_path, connection_type="local", forks=1):
+def configure_ansible_context(
+    key_path: Optional[str], connection_type: str = "local", forks: int = 1
+) -> None:
     """
     Configure Ansible CLI arguments and context.
 

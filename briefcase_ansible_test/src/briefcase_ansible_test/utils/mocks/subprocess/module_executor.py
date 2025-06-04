@@ -49,16 +49,16 @@ def execute_ansible_module(module_path):
     old_stderr = sys.stderr
     old_argv = sys.argv
 
-    print(f"iOS_DEBUG: About to set up execution environment")
+    print("iOS_DEBUG: About to set up execution environment")
 
     try:
-        print(f"iOS_DEBUG: Creating StringIO objects")
+        print("iOS_DEBUG: Creating StringIO objects")
         # Set up captured output
         captured_stdout = StringIO()
         captured_stderr = StringIO()
-        print(f"iOS_DEBUG: StringIO objects created successfully")
+        print("iOS_DEBUG: StringIO objects created successfully")
 
-        print(f"iOS_DEBUG: Saving original streams")
+        print("iOS_DEBUG: Saving original streams")
         # Save originals before replacing
         print(f"iOS_DEBUG: Original stdout: {sys.stdout}")
         print(f"iOS_DEBUG: Original stderr: {sys.stderr}")
@@ -72,16 +72,11 @@ def execute_ansible_module(module_path):
         # Set argv as if we're running the module directly
         sys.argv = [module_path]
 
-        # Create a module namespace and execute the code
-        module_globals = {
-            "__name__": "__main__",
-            "__file__": module_path,
-        }
-
         old_stdout.write("iOS_DEBUG: About to execute module code\n")
         old_stdout.flush()
 
-        # Instead of executing the complex AnsiballZ module, let's simulate what ping does
+        # Instead of executing the complex AnsiballZ module, let's simulate
+        # what ping does
         try:
             # The ping module is very simple - it just returns success
             # Rather than executing the complex AnsiballZ wrapper, let's just
