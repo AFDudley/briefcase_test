@@ -14,7 +14,7 @@ from ansible.playbook.play import Play
 from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible import context
 from ansible.module_utils.common.collections import ImmutableDict
-from ..play_executor import execute_play_with_timeout
+from briefcase_ansible_test.ansible.play_executor import execute_play_with_timeout
 
 
 @dataclass(frozen=True)
