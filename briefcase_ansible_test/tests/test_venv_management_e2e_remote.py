@@ -208,7 +208,7 @@ class TestVenvManagementE2ERemote:
         """Clean up test venvs on remote host after all tests complete."""
         yield  # Run all tests first
 
-        # Cleanup after tests
+        # Cleanup remote venvs
         try:
             subprocess.run(
                 [
@@ -230,7 +230,36 @@ class TestVenvManagementE2ERemote:
             )
             print("\n🧹 Cleaned up test venvs on night2.lan")
         except Exception as e:
-            print(f"\n⚠️  Cleanup warning: {e}")
+            print(f"\n⚠️  Remote cleanup warning: {e}")
+
+        # Cleanup local metadata files
+        try:
+            import os
+
+            # Clean up named test venvs
+            for venv_name in [
+                "e2e_test_venv",
+                "e2e_existing_venv",
+                "e2e_playbook_test",
+            ]:
+                delete_venv_metadata(paths["metadata_dir"], venv_name, "night2.lan")
+
+            # Clean up any temp files created during tests
+            metadata_dir = Path(paths["metadata_dir"]) / "resources" / "venv_metadata"
+            if metadata_dir.exists():
+                temp_files = list(metadata_dir.glob("temp_*"))
+                for temp_file in temp_files:
+                    os.remove(temp_file)
+
+                # Remove empty directories
+                if not any(metadata_dir.iterdir()):
+                    metadata_dir.rmdir()
+                    if not any(metadata_dir.parent.iterdir()):
+                        metadata_dir.parent.rmdir()
+
+            print("🧹 Cleaned up local metadata files and directories")
+        except Exception as e:
+            print(f"\n⚠️  Local cleanup warning: {e}")
 
 
 if __name__ == "__main__":
